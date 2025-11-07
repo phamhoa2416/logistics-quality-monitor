@@ -46,11 +46,12 @@ type SMTPConfig struct {
 func Load() (*Config, error) {
 	viper.SetConfigName(".env")
 	viper.SetConfigType("env")
-	viper.AddConfigPath("$HOME/.env")
+	viper.AddConfigPath(".")
+	viper.AddConfigPath("$HOME")
 	viper.AutomaticEnv()
 
 	if err := viper.ReadInConfig(); err != nil {
-		log.Printf("Error reading config file, %s", err)
+		log.Printf("Warning: Error reading config file, %s. Using environment variables only.", err)
 	}
 
 	config := &Config{
