@@ -131,8 +131,11 @@ func (s *Service) ForgotPassword(ctx context.Context, request *models.ForgotPass
 
 	user, err := s.repo.GetUserByEmail(ctx, request.Email)
 	if err != nil {
-		log.Printf("Password reset requested for non-existent email: %s", request.Email)
-		return nil
+		if errors.Is(err, appErrors.ErrUserNotFound) {
+			log.Printf("Password reset requested for non-existent email: %s", request.Email)
+			return nil
+		}
+		return fmt.Errorf("failed to retrieve user: %w", err)
 	}
 
 	resetToken := &models.PasswordResetToken{
