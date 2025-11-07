@@ -38,6 +38,10 @@ func ShipperOnly() gin.HandlerFunc {
 	return RoleMiddleware("shipper")
 }
 
+func ProviderOnly() gin.HandlerFunc {
+	return RoleMiddleware("provider")
+}
+
 func CustomerOnly() gin.HandlerFunc {
 	return RoleMiddleware("customer")
 }
