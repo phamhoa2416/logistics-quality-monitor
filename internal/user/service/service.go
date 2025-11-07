@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"logistics-quality-monitor/internal/auth/models"
-	"logistics-quality-monitor/internal/auth/repository"
 	"logistics-quality-monitor/internal/config"
+	"logistics-quality-monitor/internal/user/model"
+	"logistics-quality-monitor/internal/user/repository"
 	appErrors "logistics-quality-monitor/pkg/errors"
 	"logistics-quality-monitor/pkg/utils"
 	"time"
@@ -27,7 +27,7 @@ func NewService(repo *repository.Repository, cfg *config.Config) *Service {
 	}
 }
 
-func (s *Service) Register(ctx context.Context, request *models.RegisterRequest) (*models.AuthResponse, error) {
+func (s *Service) Register(ctx context.Context, request *model.RegisterRequest) (*model.AuthResponse, error) {
 	if err := utils.ValidateStruct(request); err != nil {
 		return nil, appErrors.NewAppError("VALIDATION_ERROR", "Invalid input", err)
 	}
@@ -49,7 +49,7 @@ func (s *Service) Register(ctx context.Context, request *models.RegisterRequest)
 		return nil, fmt.Errorf("failed to hash password: %w", err)
 	}
 
-	user := &models.User{
+	user := &model.User{
 		Username:       request.Username,
 		Email:          request.Email,
 		PasswordHashed: hashedPassword,
@@ -75,7 +75,7 @@ func (s *Service) Register(ctx context.Context, request *models.RegisterRequest)
 		return nil, fmt.Errorf("failed to generate tokens: %w", err)
 	}
 
-	return &models.AuthResponse{
+	return &model.AuthResponse{
 		User:         user.ToResponse(),
 		AccessToken:  tokenPair.AccessToken,
 		RefreshToken: tokenPair.RefreshToken,
@@ -83,7 +83,7 @@ func (s *Service) Register(ctx context.Context, request *models.RegisterRequest)
 	}, nil
 }
 
-func (s *Service) Login(ctx context.Context, request *models.LoginRequest) (*models.AuthResponse, error) {
+func (s *Service) Login(ctx context.Context, request *model.LoginRequest) (*model.AuthResponse, error) {
 	if err := utils.ValidateStruct(request); err != nil {
 		return nil, appErrors.NewAppError("VALIDATION_ERROR", "Invalid input", err)
 	}
@@ -116,7 +116,7 @@ func (s *Service) Login(ctx context.Context, request *models.LoginRequest) (*mod
 		return nil, fmt.Errorf("failed to generate tokens: %w", err)
 	}
 
-	return &models.AuthResponse{
+	return &model.AuthResponse{
 		User:         user.ToResponse(),
 		AccessToken:  tokenPair.AccessToken,
 		RefreshToken: tokenPair.RefreshToken,
@@ -124,7 +124,7 @@ func (s *Service) Login(ctx context.Context, request *models.LoginRequest) (*mod
 	}, nil
 }
 
-func (s *Service) ForgotPassword(ctx context.Context, request *models.ForgotPasswordRequest) error {
+func (s *Service) ForgotPassword(ctx context.Context, request *model.ForgotPasswordRequest) error {
 	if err := utils.ValidateStruct(request); err != nil {
 		return appErrors.NewAppError("VALIDATION_ERROR", "Invalid input", err)
 	}
@@ -138,7 +138,7 @@ func (s *Service) ForgotPassword(ctx context.Context, request *models.ForgotPass
 		return fmt.Errorf("failed to retrieve user: %w", err)
 	}
 
-	resetToken := &models.PasswordResetToken{
+	resetToken := &model.PasswordResetToken{
 		UserID:    user.ID,
 		Token:     utils.GenerateResetToken(),
 		ExpiresAt: time.Now().Add(1 * time.Hour),
@@ -157,7 +157,7 @@ func (s *Service) ForgotPassword(ctx context.Context, request *models.ForgotPass
 	return nil
 }
 
-func (s *Service) ResetPassword(ctx context.Context, request *models.ResetPasswordRequest) error {
+func (s *Service) ResetPassword(ctx context.Context, request *model.ResetPasswordRequest) error {
 	if err := utils.ValidateStruct(request); err != nil {
 		return appErrors.NewAppError("VALIDATION_ERROR", "Invalid input", err)
 	}
@@ -187,7 +187,7 @@ func (s *Service) ResetPassword(ctx context.Context, request *models.ResetPasswo
 	return nil
 }
 
-func (s *Service) ChangePassword(ctx context.Context, userID uuid.UUID, request *models.ChangePasswordRequest) error {
+func (s *Service) ChangePassword(ctx context.Context, userID uuid.UUID, request *model.ChangePasswordRequest) error {
 	if err := utils.ValidateStruct(request); err != nil {
 		return appErrors.NewAppError("VALIDATION_ERROR", "Invalid input", err)
 	}
@@ -213,7 +213,7 @@ func (s *Service) ChangePassword(ctx context.Context, userID uuid.UUID, request 
 	return s.repo.UpdatePassword(ctx, userID, hashedPassword)
 }
 
-func (s *Service) GetProfile(ctx context.Context, userID uuid.UUID) (*models.UserResponse, error) {
+func (s *Service) GetProfile(ctx context.Context, userID uuid.UUID) (*model.UserResponse, error) {
 	user, err := s.repo.GetUserByID(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -222,7 +222,7 @@ func (s *Service) GetProfile(ctx context.Context, userID uuid.UUID) (*models.Use
 	return user.ToResponse(), nil
 }
 
-func (s *Service) UpdateProfile(ctx context.Context, userID uuid.UUID, request *models.UpdateProfileRequest) (*models.UserResponse, error) {
+func (s *Service) UpdateProfile(ctx context.Context, userID uuid.UUID, request *model.UpdateProfileRequest) (*model.UserResponse, error) {
 	if err := utils.ValidateStruct(request); err != nil {
 		return nil, appErrors.NewAppError("VALIDATION_ERROR", "Invalid input", err)
 	}

@@ -5,8 +5,8 @@ import (
 	"log"
 	"net/http"
 
-	"logistics-quality-monitor/internal/auth/models"
-	"logistics-quality-monitor/internal/auth/service"
+	"logistics-quality-monitor/internal/user/model"
+	"logistics-quality-monitor/internal/user/service"
 	appErrors "logistics-quality-monitor/pkg/errors"
 	"logistics-quality-monitor/pkg/utils"
 
@@ -22,7 +22,7 @@ func NewHandler(service *service.Service) *Handler {
 }
 
 func (h *Handler) RegisterRoutes(router *gin.RouterGroup) {
-	auth := router.Group("/auth")
+	auth := router.Group("/user")
 	{
 		auth.POST("/register", h.Register)
 		auth.POST("/login", h.Login)
@@ -33,7 +33,7 @@ func (h *Handler) RegisterRoutes(router *gin.RouterGroup) {
 }
 
 func (h *Handler) Register(c *gin.Context) {
-	var request models.RegisterRequest
+	var request model.RegisterRequest
 
 	if err := c.ShouldBindJSON(&request); err != nil {
 		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body")
@@ -50,7 +50,7 @@ func (h *Handler) Register(c *gin.Context) {
 }
 
 func (h *Handler) Login(c *gin.Context) {
-	var request models.LoginRequest
+	var request model.LoginRequest
 
 	if err := c.ShouldBindJSON(&request); err != nil {
 		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body")
@@ -67,7 +67,7 @@ func (h *Handler) Login(c *gin.Context) {
 }
 
 func (h *Handler) ForgotPassword(c *gin.Context) {
-	var request models.ForgotPasswordRequest
+	var request model.ForgotPasswordRequest
 
 	if err := c.ShouldBindJSON(&request); err != nil {
 		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body")
@@ -83,7 +83,7 @@ func (h *Handler) ForgotPassword(c *gin.Context) {
 }
 
 func (h *Handler) ResetPassword(c *gin.Context) {
-	var req models.ResetPasswordRequest
+	var req model.ResetPasswordRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body")

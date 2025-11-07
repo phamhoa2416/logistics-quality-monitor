@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"logistics-quality-monitor/internal/auth/models"
+	"logistics-quality-monitor/internal/user/model"
 	"logistics-quality-monitor/pkg/utils"
 	"net/http"
 
@@ -47,7 +47,7 @@ func (h *Handler) UpdateProfile(c *gin.Context) {
 		return
 	}
 
-	var req models.UpdateProfileRequest
+	var req model.UpdateProfileRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body")
 		return
@@ -75,7 +75,7 @@ func (h *Handler) ChangePassword(c *gin.Context) {
 		return
 	}
 
-	var req models.ChangePasswordRequest
+	var req model.ChangePasswordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body")
 		return
