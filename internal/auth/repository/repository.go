@@ -8,6 +8,7 @@ import (
 	"logistics-quality-monitor/internal/auth/models"
 	"logistics-quality-monitor/internal/database"
 	appErrors "logistics-quality-monitor/pkg/errors"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -50,7 +51,13 @@ func (r *Repository) CreateUser(ctx context.Context, user *models.User) error {
 	).Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt)
 
 	if err != nil {
-		if err.Error() == "pq: duplicate key value violates unique constraint \"users_email_key\"" {
+		errStr := err.Error()
+		// Check for unique constraint violation on email
+		if contains(errStr, "duplicate key value violates unique constraint") && contains(errStr, "users_email_key") {
+			return appErrors.ErrUserAlreadyExists
+		}
+		// Also check for generic unique constraint violations that might indicate email conflict
+		if contains(errStr, "duplicate key") && contains(errStr, "email") {
 			return appErrors.ErrUserAlreadyExists
 		}
 
@@ -184,21 +191,17 @@ func (r *Repository) UpdatePassword(ctx context.Context, userID uuid.UUID, passw
 }
 
 func (r *Repository) CreatePasswordResetToken(ctx context.Context, token *models.PasswordResetToken) error {
-	createTableQuery := `
-        CREATE TABLE IF NOT EXISTS password_reset_tokens (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-            token VARCHAR(255) UNIQUE NOT NULL,
-            expires_at TIMESTAMPTZ NOT NULL,
-            used BOOLEAN DEFAULT false,
-            created_at TIMESTAMPTZ DEFAULT now()
-        )
-    `
-
-	_, err := r.db.DB.ExecContext(ctx, createTableQuery)
-	if err != nil {
-		return fmt.Errorf("failed to create password_reset_tokens table: %w", err)
-	}
+	// TODO: The table creation should ideally be done via migrations, but included here for completeness
+	// createTableQuery := `
+	//    CREATE TABLE IF NOT EXISTS password_reset_tokens (
+	//        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+	//        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+	//        token VARCHAR(255) UNIQUE NOT NULL,
+	//        expires_at TIMESTAMPTZ NOT NULL,
+	//        used BOOLEAN DEFAULT false,
+	//        created_at TIMESTAMPTZ DEFAULT now()
+	//    )
+	//`
 
 	query := `
         INSERT INTO password_reset_tokens (id, user_id, token, expires_at, used, created_at)
@@ -210,7 +213,7 @@ func (r *Repository) CreatePasswordResetToken(ctx context.Context, token *models
 	token.CreatedAt = time.Now()
 	token.Used = false
 
-	err = r.db.DB.QueryRowContext(
+	err := r.db.DB.QueryRowContext(
 		ctx,
 		query,
 		token.ID,
@@ -255,4 +258,8 @@ func (r *Repository) MarkTokenAsUsed(ctx context.Context, tokenID uuid.UUID) err
 	query := `UPDATE password_reset_tokens SET used = true WHERE id = $1`
 	_, err := r.db.DB.ExecContext(ctx, query, tokenID)
 	return err
+}
+
+func contains(s, substr string) bool {
+	return strings.Contains(strings.ToLower(s), strings.ToLower(substr))
 }
