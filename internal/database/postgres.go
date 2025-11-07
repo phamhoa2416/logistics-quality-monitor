@@ -6,6 +6,8 @@ import (
 	"log"
 	"logistics-quality-monitor/internal/config"
 	"time"
+
+	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 type Database struct {
