@@ -1,0 +1,92 @@
+package config
+
+import (
+	"fmt"
+	"log"
+
+	"github.com/spf13/viper"
+)
+
+type Config struct {
+	Server   ServerConfig
+	Database DatabaseConfig
+	JWT      JWTConfig
+	SMTP     SMTPConfig
+}
+
+type ServerConfig struct {
+	Port        string
+	Host        string
+	Environment string
+}
+
+type DatabaseConfig struct {
+	Host     string
+	Port     string
+	User     string
+	Password string
+	DBName   string
+	SSLMode  string
+}
+
+type JWTConfig struct {
+	Secret             string
+	ExpiryHours        int
+	RefreshExpiryHours int
+}
+
+type SMTPConfig struct {
+	Host     string
+	Port     int
+	User     string
+	Password string
+	From     string
+}
+
+func Load() (*Config, error) {
+	viper.SetConfigName(".env")
+	viper.SetConfigType("env")
+	viper.AddConfigPath("$HOME/.env")
+	viper.AutomaticEnv()
+
+	if err := viper.ReadInConfig(); err != nil {
+		log.Printf("Error reading config file, %s", err)
+	}
+
+	config := &Config{
+		Server: ServerConfig{
+			Port:        viper.GetString("SERVER_PORT"),
+			Host:        viper.GetString("SERVER_HOST"),
+			Environment: viper.GetString("ENVIRONMENT"),
+		},
+		Database: DatabaseConfig{
+			Host:     viper.GetString("DB_HOST"),
+			Port:     viper.GetString("DB_PORT"),
+			User:     viper.GetString("DB_USER"),
+			Password: viper.GetString("DB_PASSWORD"),
+			DBName:   viper.GetString("DB_NAME"),
+			SSLMode:  viper.GetString("DB_SSLMODE"),
+		},
+		JWT: JWTConfig{
+			Secret:             viper.GetString("JWT_SECRET"),
+			ExpiryHours:        viper.GetInt("JWT_EXPIRY_HOURS"),
+			RefreshExpiryHours: viper.GetInt("JWT_REFRESH_EXPIRY_HOURS"),
+		},
+		SMTP: SMTPConfig{
+			Host:     viper.GetString("SMTP_HOST"),
+			Port:     viper.GetInt("SMTP_PORT"),
+			User:     viper.GetString("SMTP_USER"),
+			Password: viper.GetString("SMTP_PASSWORD"),
+			From:     viper.GetString("SMTP_FROM"),
+		},
+	}
+
+	return config, nil
+}
+
+func (c *DatabaseConfig) DSN() string {
+	return fmt.Sprintf(
+		"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
+		c.Host, c.Port, c.User, c.Password, c.DBName, c.SSLMode,
+	)
+}
