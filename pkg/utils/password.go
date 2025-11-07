@@ -43,7 +43,7 @@ func ValidatePassword(password string) error {
 		}
 	}
 
-	if !hasMinLength || !hasUpper || !hasLower || !hasNumber || hasSpecial {
+	if !hasMinLength || !hasUpper || !hasLower || !hasNumber || !hasSpecial {
 		return errors.New("password must be at least 8 characters and contain uppercase, " +
 			"lowercase, number and special symbol")
 	}
