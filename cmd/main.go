@@ -3,19 +3,20 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log"
+	"net"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
 	"logistics-quality-monitor/internal/auth/handler"
 	"logistics-quality-monitor/internal/auth/repository"
 	"logistics-quality-monitor/internal/auth/service"
 	"logistics-quality-monitor/internal/config"
 	"logistics-quality-monitor/internal/database"
 	"logistics-quality-monitor/internal/middleware"
-	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -37,12 +38,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
-	defer func(db *database.Database) {
-		err := db.Close()
-		if err != nil {
-
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Printf("Failed to close database connection: %v", err)
 		}
-	}(db)
+	}()
 
 	authRepository := repository.NewRepository(db)
 	authService := service.NewService(authRepository, cfg)
@@ -79,7 +79,7 @@ func main() {
 		protected := v1.Group("")
 		protected.Use(middleware.AuthMiddleware(cfg))
 		{
-			authHandler.RegisterProfileRoutes(v1)
+			authHandler.RegisterProfileRoutes(protected)
 
 			admin := protected.Group("/admin")
 			admin.Use(middleware.AdminOnly())
@@ -93,8 +93,18 @@ func main() {
 		}
 	}
 
+	host := cfg.Server.Host
+	if host == "" {
+		host = "0.0.0.0"
+	}
+	port := cfg.Server.Port
+	if port == "" {
+		port = "8080"
+	}
+	addr := net.JoinHostPort(host, port)
+
 	server := &http.Server{
-		Addr:         fmt.Sprintf(":%s", cfg.Server.Port),
+		Addr:         addr,
 		Handler:      router,
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
@@ -103,7 +113,7 @@ func main() {
 
 	// Start goroutine
 	go func() {
-		log.Printf("Server starting on port %s", cfg.Server.Port)
+		log.Printf("Server starting on %s", addr)
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("Failed to start server: %v", err)
 		}
@@ -128,13 +138,23 @@ func main() {
 
 func corsMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		headers := c.Writer.Header()
+		origin := c.GetHeader("Origin")
 
-		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatus(204)
+		headers.Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		headers.Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		headers.Set("Vary", "Origin")
+
+		if origin == "" {
+			headers.Set("Access-Control-Allow-Origin", "*")
+			headers.Del("Access-Control-Allow-Credentials")
+		} else {
+			headers.Set("Access-Control-Allow-Origin", origin)
+			headers.Set("Access-Control-Allow-Credentials", "true")
+		}
+
+		if c.Request.Method == http.MethodOptions {
+			c.AbortWithStatus(http.StatusNoContent)
 			return
 		}
 
