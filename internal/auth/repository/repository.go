@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"logistics-quality-monitor/internal/auth/models"
@@ -12,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 type Repository struct {
@@ -23,44 +23,16 @@ func NewRepository(db *database.Database) *Repository {
 }
 
 func (r *Repository) CreateUser(ctx context.Context, user *models.User) error {
-	query := `
-        INSERT INTO users (id, username, email, hashed_password, full_name, phone_number, role, address, is_active, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-        RETURNING id, created_at, updated_at
-    `
-
 	user.ID = uuid.New()
 	user.CreatedAt = time.Now()
 	user.UpdatedAt = time.Now()
 	user.IsActive = true
 
-	err := r.db.DB.QueryRowContext(
-		ctx,
-		query,
-		user.ID,
-		user.Username,
-		user.Email,
-		user.PasswordHashed,
-		user.FullName,
-		user.PhoneNumber,
-		user.Role,
-		user.Address,
-		user.IsActive,
-		user.CreatedAt,
-		user.UpdatedAt,
-	).Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt)
-
-	if err != nil {
-		errStr := err.Error()
-		// Check for unique constraint violation on email
-		if contains(errStr, "duplicate key value violates unique constraint") && contains(errStr, "users_email_key") {
+	if err := r.db.DB.WithContext(ctx).Create(user).Error; err != nil {
+		errStr := strings.ToLower(err.Error())
+		if strings.Contains(errStr, "duplicate key") && strings.Contains(errStr, "email") {
 			return appErrors.ErrUserAlreadyExists
 		}
-		// Also check for generic unique constraint violations that might indicate email conflict
-		if contains(errStr, "duplicate key") && contains(errStr, "email") {
-			return appErrors.ErrUserAlreadyExists
-		}
-
 		return fmt.Errorf("failed to create user: %w", err)
 	}
 
@@ -68,98 +40,48 @@ func (r *Repository) CreateUser(ctx context.Context, user *models.User) error {
 }
 
 func (r *Repository) GetUserByEmail(ctx context.Context, email string) (*models.User, error) {
-	query := `
-        SELECT id, username, email, hashed_password, full_name, phone_number, role, address, is_active, created_at, updated_at
-        FROM users
-        WHERE email = $1
-    `
+	var user models.User
+	err := r.db.DB.WithContext(ctx).Where("email = ?", email).First(&user).Error
 
-	user := &models.User{}
-	err := r.db.DB.QueryRowContext(ctx, query, email).Scan(
-		&user.ID,
-		&user.Username,
-		&user.Email,
-		&user.PasswordHashed,
-		&user.FullName,
-		&user.PhoneNumber,
-		&user.Role,
-		&user.Address,
-		&user.IsActive,
-		&user.CreatedAt,
-		&user.UpdatedAt,
-	)
-
-	if errors.Is(err, sql.ErrNoRows) {
+	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, appErrors.ErrUserNotFound
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user: %w", err)
 	}
-
-	return user, nil
+	return &user, nil
 }
 
 func (r *Repository) GetUserByID(ctx context.Context, userID uuid.UUID) (*models.User, error) {
-	query := `
-        SELECT id, username, email, hashed_password, full_name, phone_number, role, address, is_active, created_at, updated_at
-        FROM users
-        WHERE id = $1
-    `
+	var user models.User
+	err := r.db.DB.WithContext(ctx).First(&user, "id = ?", userID).Error
 
-	user := &models.User{}
-	err := r.db.DB.QueryRowContext(ctx, query, userID).Scan(
-		&user.ID,
-		&user.Username,
-		&user.Email,
-		&user.PasswordHashed,
-		&user.FullName,
-		&user.PhoneNumber,
-		&user.Role,
-		&user.Address,
-		&user.IsActive,
-		&user.CreatedAt,
-		&user.UpdatedAt,
-	)
-
-	if errors.Is(err, sql.ErrNoRows) {
+	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, appErrors.ErrUserNotFound
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user: %w", err)
 	}
-
-	return user, nil
+	return &user, nil
 }
 
 func (r *Repository) UpdateUser(ctx context.Context, user *models.User) error {
-	query := `
-        UPDATE users
-        SET full_name = $1, phone_number = $2, address = $3, updated_at = $4
-        WHERE id = $5
-    `
-
 	user.UpdatedAt = time.Now()
 
-	result, err := r.db.DB.ExecContext(
-		ctx,
-		query,
-		user.FullName,
-		user.PhoneNumber,
-		user.Address,
-		user.UpdatedAt,
-		user.ID,
-	)
+	result := r.db.DB.WithContext(ctx).Model(&models.User{}).
+		Where("id = ?", user.ID).
+		Updates(map[string]interface{}{
+			"full_name":    user.FullName,
+			"phone_number": user.PhoneNumber,
+			"address":      user.Address,
+			"updated_at":   user.UpdatedAt,
+		})
 
-	if err != nil {
-		return fmt.Errorf("failed to update user: %w", err)
+	if result.Error != nil {
+		return fmt.Errorf("failed to update user: %w", result.Error)
 	}
 
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-
-	if rowsAffected == 0 {
+	if result.RowsAffected == 0 {
 		return appErrors.ErrUserNotFound
 	}
 
@@ -167,99 +89,54 @@ func (r *Repository) UpdateUser(ctx context.Context, user *models.User) error {
 }
 
 func (r *Repository) UpdatePassword(ctx context.Context, userID uuid.UUID, passwordHash string) error {
-	query := `
-        UPDATE users
-        SET hashed_password = $1, updated_at = $2
-        WHERE id = $3
-    `
+	result := r.db.DB.WithContext(ctx).Model(&models.User{}).
+		Where("id = ?", userID).
+		Updates(map[string]interface{}{
+			"password_hashed": passwordHash,
+			"updated_at":      time.Now(),
+		})
 
-	result, err := r.db.DB.ExecContext(ctx, query, passwordHash, time.Now(), userID)
-	if err != nil {
-		return fmt.Errorf("failed to update password: %w", err)
+	if result.Error != nil {
+		return fmt.Errorf("failed to update password: %w", result.Error)
 	}
-
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-
-	if rowsAffected == 0 {
+	if result.RowsAffected == 0 {
 		return appErrors.ErrUserNotFound
 	}
-
 	return nil
 }
 
 func (r *Repository) CreatePasswordResetToken(ctx context.Context, token *models.PasswordResetToken) error {
-	// TODO: The table creation should ideally be done via migrations, but included here for completeness
-	// createTableQuery := `
-	//    CREATE TABLE IF NOT EXISTS password_reset_tokens (
-	//        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-	//        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-	//        token VARCHAR(255) UNIQUE NOT NULL,
-	//        expires_at TIMESTAMPTZ NOT NULL,
-	//        used BOOLEAN DEFAULT false,
-	//        created_at TIMESTAMPTZ DEFAULT now()
-	//    )
-	//`
-
-	query := `
-        INSERT INTO password_reset_tokens (id, user_id, token, expires_at, used, created_at)
-        VALUES ($1, $2, $3, $4, $5, $6)
-        RETURNING id, created_at
-    `
-
 	token.ID = uuid.New()
 	token.CreatedAt = time.Now()
 	token.Used = false
 
-	err := r.db.DB.QueryRowContext(
-		ctx,
-		query,
-		token.ID,
-		token.UserID,
-		token.Token,
-		token.ExpiresAt,
-		token.Used,
-		token.CreatedAt,
-	).Scan(&token.ID, &token.CreatedAt)
-
-	return err
+	if err := r.db.DB.WithContext(ctx).Create(token).Error; err != nil {
+		return fmt.Errorf("failed to create reset token: %w", err)
+	}
+	return nil
 }
 
 func (r *Repository) GetPasswordResetToken(ctx context.Context, token string) (*models.PasswordResetToken, error) {
-	query := `
-        SELECT id, user_id, token, expires_at, used, created_at
-        FROM password_reset_tokens
-        WHERE token = $1 AND used = false AND expires_at > NOW()
-    `
+	var resetToken models.PasswordResetToken
+	err := r.db.DB.WithContext(ctx).
+		Where("token = ? AND used = false AND expires_at > NOW()", token).
+		First(&resetToken).Error
 
-	resetToken := &models.PasswordResetToken{}
-	err := r.db.DB.QueryRowContext(ctx, query, token).Scan(
-		&resetToken.ID,
-		&resetToken.UserID,
-		&resetToken.Token,
-		&resetToken.ExpiresAt,
-		&resetToken.Used,
-		&resetToken.CreatedAt,
-	)
-
-	if errors.Is(err, sql.ErrNoRows) {
+	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, appErrors.ErrTokenInvalid
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to get reset token: %w", err)
 	}
 
-	return resetToken, nil
+	return &resetToken, nil
 }
 
 func (r *Repository) MarkTokenAsUsed(ctx context.Context, tokenID uuid.UUID) error {
-	query := `UPDATE password_reset_tokens SET used = true WHERE id = $1`
-	_, err := r.db.DB.ExecContext(ctx, query, tokenID)
-	return err
-}
+	result := r.db.DB.WithContext(ctx).
+		Model(&models.PasswordResetToken{}).
+		Where("id = ?", tokenID).
+		Update("used", true)
 
-func contains(s, substr string) bool {
-	return strings.Contains(strings.ToLower(s), strings.ToLower(substr))
+	return result.Error
 }
