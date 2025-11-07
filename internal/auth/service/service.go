@@ -246,7 +246,7 @@ func (s *Service) UpdateProfile(ctx context.Context, userID uuid.UUID, request *
 	return user.ToResponse(), nil
 }
 
-func (s *Service) RefreshToken(refreshToken string) (*utils.TokenPair, error) {
+func (s *Service) RefreshToken(ctx context.Context, refreshToken string) (*utils.TokenPair, error) {
 	claims, err := utils.ValidateToken(refreshToken, s.config.JWT.Secret)
 	if err != nil {
 		return nil, appErrors.ErrInvalidToken
