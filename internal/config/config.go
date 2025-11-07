@@ -1,8 +1,10 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/spf13/viper"
 )
@@ -44,14 +46,19 @@ type SMTPConfig struct {
 }
 
 func Load() (*Config, error) {
-	viper.SetConfigName(".env")
-	viper.SetConfigType("env")
+	viper.SetConfigFile(".env")
 	viper.AddConfigPath(".")
-	viper.AddConfigPath("$HOME")
+	if homeDir, err := os.UserHomeDir(); err == nil {
+		viper.AddConfigPath(homeDir)
+	}
 	viper.AutomaticEnv()
 
 	if err := viper.ReadInConfig(); err != nil {
-		log.Printf("Warning: Error reading config file, %s. Using environment variables only.", err)
+		var configFileNotFoundError viper.ConfigFileNotFoundError
+		if !errors.As(err, &configFileNotFoundError) {
+			return nil, fmt.Errorf("failed to read config: %w", err)
+		}
+		log.Printf("Warning: config file not found: %v. Falling back to environment variables only.", err)
 	}
 
 	config := &Config{
