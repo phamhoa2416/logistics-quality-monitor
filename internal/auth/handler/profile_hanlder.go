@@ -25,9 +25,15 @@ func (h *Handler) GetProfile(c *gin.Context) {
 		return
 	}
 
-	profile, err := h.service.GetProfile(c.Request.Context(), userID.(uuid.UUID))
+	userUUID, ok := userID.(uuid.UUID)
+	if !ok {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Invalid user identifier")
+		return
+	}
+
+	profile, err := h.service.GetProfile(c.Request.Context(), userUUID)
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusInternalServerError, err.Error())
+		respondWithError(c, err)
 		return
 	}
 
@@ -47,9 +53,15 @@ func (h *Handler) UpdateProfile(c *gin.Context) {
 		return
 	}
 
-	profile, err := h.service.UpdateProfile(c.Request.Context(), userID.(uuid.UUID), &req)
+	userUUID, ok := userID.(uuid.UUID)
+	if !ok {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Invalid user identifier")
+		return
+	}
+
+	profile, err := h.service.UpdateProfile(c.Request.Context(), userUUID, &req)
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, err.Error())
+		respondWithError(c, err)
 		return
 	}
 
@@ -69,8 +81,14 @@ func (h *Handler) ChangePassword(c *gin.Context) {
 		return
 	}
 
-	if err := h.service.ChangePassword(c.Request.Context(), userID.(uuid.UUID), &req); err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, err.Error())
+	userUUID, ok := userID.(uuid.UUID)
+	if !ok {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Invalid user identifier")
+		return
+	}
+
+	if err := h.service.ChangePassword(c.Request.Context(), userUUID, &req); err != nil {
+		respondWithError(c, err)
 		return
 	}
 
