@@ -23,7 +23,7 @@ func NewRepository(db *database.Database) *Repository {
 
 func (r *Repository) CreateUser(ctx context.Context, user *models.User) error {
 	query := `
-        INSERT INTO users (id, username, email, password, full_name, phone_number, role, address, is_active, created_at, updated_at)
+        INSERT INTO users (id, username, email, hashed_password, full_name, phone_number, role, address, is_active, created_at, updated_at)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
         RETURNING id, created_at, updated_at
     `
@@ -39,7 +39,7 @@ func (r *Repository) CreateUser(ctx context.Context, user *models.User) error {
 		user.ID,
 		user.Username,
 		user.Email,
-		user.Password,
+		user.PasswordHashed,
 		user.FullName,
 		user.PhoneNumber,
 		user.Role,
@@ -62,7 +62,7 @@ func (r *Repository) CreateUser(ctx context.Context, user *models.User) error {
 
 func (r *Repository) GetUserByEmail(ctx context.Context, email string) (*models.User, error) {
 	query := `
-        SELECT id, username, email, password, full_name, phone_number, role, address, is_active, created_at, updated_at
+        SELECT id, username, email, hashed_password, full_name, phone_number, role, address, is_active, created_at, updated_at
         FROM users
         WHERE email = $1
     `
@@ -72,7 +72,7 @@ func (r *Repository) GetUserByEmail(ctx context.Context, email string) (*models.
 		&user.ID,
 		&user.Username,
 		&user.Email,
-		&user.Password,
+		&user.PasswordHashed,
 		&user.FullName,
 		&user.PhoneNumber,
 		&user.Role,
@@ -94,7 +94,7 @@ func (r *Repository) GetUserByEmail(ctx context.Context, email string) (*models.
 
 func (r *Repository) GetUserByID(ctx context.Context, userID uuid.UUID) (*models.User, error) {
 	query := `
-        SELECT id, username, email, password, full_name, phone_number, role, address, is_active, created_at, updated_at
+        SELECT id, username, email, hashed_password, full_name, phone_number, role, address, is_active, created_at, updated_at
         FROM users
         WHERE id = $1
     `
@@ -104,7 +104,7 @@ func (r *Repository) GetUserByID(ctx context.Context, userID uuid.UUID) (*models
 		&user.ID,
 		&user.Username,
 		&user.Email,
-		&user.Password,
+		&user.PasswordHashed,
 		&user.FullName,
 		&user.PhoneNumber,
 		&user.Role,
@@ -159,14 +159,14 @@ func (r *Repository) UpdateUser(ctx context.Context, user *models.User) error {
 	return nil
 }
 
-func (r *Repository) UpdatePassword(ctx context.Context, userID uuid.UUID, password string) error {
+func (r *Repository) UpdatePassword(ctx context.Context, userID uuid.UUID, passwordHash string) error {
 	query := `
         UPDATE users
-        SET password = $1, updated_at = $2
+        SET hashed_password = $1, updated_at = $2
         WHERE id = $3
     `
 
-	result, err := r.db.DB.ExecContext(ctx, query, password, time.Now(), userID)
+	result, err := r.db.DB.ExecContext(ctx, query, passwordHash, time.Now(), userID)
 	if err != nil {
 		return fmt.Errorf("failed to update password: %w", err)
 	}
