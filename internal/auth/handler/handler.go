@@ -1,10 +1,14 @@
 package handler
 
 import (
+	"errors"
+	"log"
+	"net/http"
+
 	"logistics-quality-monitor/internal/auth/models"
 	"logistics-quality-monitor/internal/auth/service"
+	appErrors "logistics-quality-monitor/pkg/errors"
 	"logistics-quality-monitor/pkg/utils"
-	"net/http"
 
 	"github.com/gin-gonic/gin"
 )
@@ -38,7 +42,7 @@ func (h *Handler) Register(c *gin.Context) {
 
 	authResponse, err := h.service.Register(c.Request.Context(), &request)
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusInternalServerError, err.Error())
+		respondWithError(c, err)
 		return
 	}
 
@@ -55,7 +59,7 @@ func (h *Handler) Login(c *gin.Context) {
 
 	authResponse, err := h.service.Login(c.Request.Context(), &request)
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusUnauthorized, err.Error())
+		respondWithError(c, err)
 		return
 	}
 
@@ -71,7 +75,7 @@ func (h *Handler) ForgotPassword(c *gin.Context) {
 	}
 
 	if err := h.service.ForgotPassword(c.Request.Context(), &request); err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, err.Error())
+		respondWithError(c, err)
 		return
 	}
 
@@ -87,7 +91,7 @@ func (h *Handler) ResetPassword(c *gin.Context) {
 	}
 
 	if err := h.service.ResetPassword(c.Request.Context(), &req); err != nil {
-		utils.ErrorResponse(c, http.StatusBadRequest, err.Error())
+		respondWithError(c, err)
 		return
 	}
 
@@ -107,9 +111,45 @@ func (h *Handler) RefreshToken(c *gin.Context) {
 
 	tokenPair, err := h.service.RefreshToken(c.Request.Context(), refreshToken)
 	if err != nil {
-		utils.ErrorResponse(c, http.StatusUnauthorized, err.Error())
+		respondWithError(c, err)
 		return
 	}
 
 	utils.SuccessResponse(c, http.StatusOK, "Token refreshed successfully", tokenPair)
+}
+
+func respondWithError(c *gin.Context, err error) {
+	if err == nil {
+		return
+	}
+
+	switch {
+	case errors.Is(err, appErrors.ErrUserAlreadyExists):
+		utils.ErrorResponse(c, http.StatusConflict, err.Error())
+	case errors.Is(err, appErrors.ErrInvalidCredentials),
+		errors.Is(err, appErrors.ErrInvalidToken),
+		errors.Is(err, appErrors.ErrTokenInvalid),
+		errors.Is(err, appErrors.ErrTokenExpired),
+		errors.Is(err, appErrors.ErrUnauthorized):
+		utils.ErrorResponse(c, http.StatusUnauthorized, err.Error())
+	case errors.Is(err, appErrors.ErrUserInactive),
+		errors.Is(err, appErrors.ErrInsufficientPermissions):
+		utils.ErrorResponse(c, http.StatusForbidden, err.Error())
+	case errors.Is(err, appErrors.ErrUserNotFound):
+		utils.ErrorResponse(c, http.StatusNotFound, err.Error())
+	default:
+		var appErr *appErrors.AppError
+		if errors.As(err, &appErr) {
+			switch appErr.Code {
+			case "VALIDATION_ERROR", "WEAK_PASSWORD":
+				utils.ErrorResponse(c, http.StatusBadRequest, appErr.Message)
+			default:
+				utils.ErrorResponse(c, http.StatusBadRequest, appErr.Message)
+			}
+			return
+		}
+
+		log.Printf("internal error: %v", err)
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Internal server error")
+	}
 }
