@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"logistics-quality-monitor/internal/auth/models"
 	"logistics-quality-monitor/internal/auth/repository"
@@ -31,7 +32,10 @@ func (s *Service) Register(ctx context.Context, request *models.RegisterRequest)
 		return nil, appErrors.NewAppError("WEAK_PASSWORD", err.Error(), nil)
 	}
 
-	existingUser, _ := s.repo.GetUserByEmail(ctx, request.Email)
+	existingUser, err := s.repo.GetUserByEmail(ctx, request.Email)
+	if err != nil && !errors.Is(err, appErrors.ErrUserNotFound) {
+		return nil, fmt.Errorf("failed to check existing user: %w", err)
+	}
 	if existingUser != nil {
 		return nil, appErrors.ErrUserAlreadyExists
 	}
