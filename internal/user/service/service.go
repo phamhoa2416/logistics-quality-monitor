@@ -8,7 +8,6 @@ import (
 	"logistics-quality-monitor/internal/config"
 	"logistics-quality-monitor/internal/user/model"
 	"logistics-quality-monitor/internal/user/repository"
-	"logistics-quality-monitor/internal/user/validator"
 	appErrors "logistics-quality-monitor/pkg/errors"
 	"logistics-quality-monitor/pkg/utils"
 	"time"
@@ -16,20 +15,20 @@ import (
 	"github.com/google/uuid"
 )
 
-type Service struct {
-	repo   *repository.Repository
+type UserService struct {
+	repo   *repository.UserRepository
 	config *config.Config
 }
 
-func NewService(repo *repository.Repository, cfg *config.Config) *Service {
-	return &Service{
+func NewService(repo *repository.UserRepository, cfg *config.Config) *UserService {
+	return &UserService{
 		repo:   repo,
 		config: cfg,
 	}
 }
 
-func (s *Service) Register(ctx context.Context, request *model.RegisterRequest) (*model.AuthResponse, error) {
-	if err := validator.ValidateStruct(request); err != nil {
+func (s *UserService) Register(ctx context.Context, request *model.RegisterRequest) (*model.AuthResponse, error) {
+	if err := utils.ValidateStruct(request); err != nil {
 		return nil, appErrors.NewAppError("VALIDATION_ERROR", "Invalid input", err)
 	}
 
@@ -84,8 +83,8 @@ func (s *Service) Register(ctx context.Context, request *model.RegisterRequest) 
 	}, nil
 }
 
-func (s *Service) Login(ctx context.Context, request *model.LoginRequest) (*model.AuthResponse, error) {
-	if err := validator.ValidateStruct(request); err != nil {
+func (s *UserService) Login(ctx context.Context, request *model.LoginRequest) (*model.AuthResponse, error) {
+	if err := utils.ValidateStruct(request); err != nil {
 		return nil, appErrors.NewAppError("VALIDATION_ERROR", "Invalid input", err)
 	}
 
@@ -125,8 +124,8 @@ func (s *Service) Login(ctx context.Context, request *model.LoginRequest) (*mode
 	}, nil
 }
 
-func (s *Service) ForgotPassword(ctx context.Context, request *model.ForgotPasswordRequest) error {
-	if err := validator.ValidateStruct(request); err != nil {
+func (s *UserService) ForgotPassword(ctx context.Context, request *model.ForgotPasswordRequest) error {
+	if err := utils.ValidateStruct(request); err != nil {
 		return appErrors.NewAppError("VALIDATION_ERROR", "Invalid input", err)
 	}
 
@@ -158,8 +157,8 @@ func (s *Service) ForgotPassword(ctx context.Context, request *model.ForgotPassw
 	return nil
 }
 
-func (s *Service) ResetPassword(ctx context.Context, request *model.ResetPasswordRequest) error {
-	if err := validator.ValidateStruct(request); err != nil {
+func (s *UserService) ResetPassword(ctx context.Context, request *model.ResetPasswordRequest) error {
+	if err := utils.ValidateStruct(request); err != nil {
 		return appErrors.NewAppError("VALIDATION_ERROR", "Invalid input", err)
 	}
 
@@ -188,8 +187,8 @@ func (s *Service) ResetPassword(ctx context.Context, request *model.ResetPasswor
 	return nil
 }
 
-func (s *Service) ChangePassword(ctx context.Context, userID uuid.UUID, request *model.ChangePasswordRequest) error {
-	if err := validator.ValidateStruct(request); err != nil {
+func (s *UserService) ChangePassword(ctx context.Context, userID uuid.UUID, request *model.ChangePasswordRequest) error {
+	if err := utils.ValidateStruct(request); err != nil {
 		return appErrors.NewAppError("VALIDATION_ERROR", "Invalid input", err)
 	}
 
@@ -214,7 +213,7 @@ func (s *Service) ChangePassword(ctx context.Context, userID uuid.UUID, request 
 	return s.repo.UpdatePassword(ctx, userID, hashedPassword)
 }
 
-func (s *Service) GetProfile(ctx context.Context, userID uuid.UUID) (*model.UserResponse, error) {
+func (s *UserService) GetProfile(ctx context.Context, userID uuid.UUID) (*model.UserResponse, error) {
 	user, err := s.repo.GetUserByID(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -223,8 +222,8 @@ func (s *Service) GetProfile(ctx context.Context, userID uuid.UUID) (*model.User
 	return user.ToResponse(), nil
 }
 
-func (s *Service) UpdateProfile(ctx context.Context, userID uuid.UUID, request *model.UpdateProfileRequest) (*model.UserResponse, error) {
-	if err := validator.ValidateStruct(request); err != nil {
+func (s *UserService) UpdateProfile(ctx context.Context, userID uuid.UUID, request *model.UpdateProfileRequest) (*model.UserResponse, error) {
+	if err := utils.ValidateStruct(request); err != nil {
 		return nil, appErrors.NewAppError("VALIDATION_ERROR", "Invalid input", err)
 	}
 
@@ -250,7 +249,7 @@ func (s *Service) UpdateProfile(ctx context.Context, userID uuid.UUID, request *
 	return user.ToResponse(), nil
 }
 
-func (s *Service) RefreshToken(ctx context.Context, refreshToken string) (*utils.TokenPair, error) {
+func (s *UserService) RefreshToken(ctx context.Context, refreshToken string) (*utils.TokenPair, error) {
 	claims, err := utils.ValidateToken(refreshToken, s.config.JWT.Secret)
 	if err != nil {
 		return nil, appErrors.ErrInvalidToken
