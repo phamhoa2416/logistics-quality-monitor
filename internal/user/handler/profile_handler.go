@@ -58,11 +58,11 @@ func (h *UserHandler) UpdateProfile(c *gin.Context) {
 		req.FullName = &sanitized
 	}
 	if req.PhoneNumber != nil {
-		sanitized := utils.SanitizeString(*req.PhoneNumber)
+		sanitized := utils.SanitizePhone(*req.PhoneNumber)
 		req.PhoneNumber = &sanitized
 	}
 	if req.Address != nil {
-		sanitized := utils.SanitizeString(*req.Address)
+		sanitized := utils.SanitizeText(*req.Address)
 		req.Address = &sanitized
 	}
 
