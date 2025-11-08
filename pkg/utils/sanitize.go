@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"fmt"
 	"html"
 	"regexp"
 	"strings"
@@ -86,13 +85,4 @@ func removeControlChars(input string) string {
 		}
 	}
 	return result.String()
-}
-
-// ValidateAndSanitizeEmail validates and sanitizes email
-func ValidateAndSanitizeEmail(email string) (string, error) {
-	sanitized := SanitizeEmail(email)
-	if !IsValidEmail(sanitized) {
-		return "", fmt.Errorf("invalid email format")
-	}
-	return sanitized, nil
 }
