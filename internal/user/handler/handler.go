@@ -24,13 +24,13 @@ func NewHandler(service *service.UserService) *UserHandler {
 }
 
 func (h *UserHandler) RegisterRoutes(router *gin.RouterGroup) {
-	auth := router.Group("/user")
+	user := router.Group("/user")
 	{
-		auth.POST("/register", h.Register)
-		auth.POST("/login", h.Login)
-		auth.POST("/forgot-password", h.ForgotPassword)
-		auth.POST("/reset-password", h.ResetPassword)
-		auth.POST("/refresh", h.RefreshToken)
+		user.POST("/register", h.Register)
+		user.POST("/login", h.Login)
+		user.POST("/forgot-password", h.ForgotPassword)
+		user.POST("/reset-password", h.ResetPassword)
+		user.POST("/refresh", h.RefreshToken)
 	}
 }
 
