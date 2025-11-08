@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func (h *Handler) RegisterProfileRoutes(router *gin.RouterGroup) {
+func (h *UserHandler) RegisterProfileRoutes(router *gin.RouterGroup) {
 	profile := router.Group("/profile")
 	{
 		profile.GET("", h.GetProfile)
@@ -18,7 +18,7 @@ func (h *Handler) RegisterProfileRoutes(router *gin.RouterGroup) {
 	}
 }
 
-func (h *Handler) GetProfile(c *gin.Context) {
+func (h *UserHandler) GetProfile(c *gin.Context) {
 	userID, exists := c.Get("userID")
 	if !exists {
 		utils.ErrorResponse(c, http.StatusUnauthorized, "User not authenticated")
@@ -40,7 +40,7 @@ func (h *Handler) GetProfile(c *gin.Context) {
 	utils.SuccessResponse(c, http.StatusOK, "Profile retrieved successfully", profile)
 }
 
-func (h *Handler) UpdateProfile(c *gin.Context) {
+func (h *UserHandler) UpdateProfile(c *gin.Context) {
 	userID, exists := c.Get("userID")
 	if !exists {
 		utils.ErrorResponse(c, http.StatusUnauthorized, "User not authenticated")
@@ -68,7 +68,7 @@ func (h *Handler) UpdateProfile(c *gin.Context) {
 	utils.SuccessResponse(c, http.StatusOK, "Profile updated successfully", profile)
 }
 
-func (h *Handler) ChangePassword(c *gin.Context) {
+func (h *UserHandler) ChangePassword(c *gin.Context) {
 	userID, exists := c.Get("userID")
 	if !exists {
 		utils.ErrorResponse(c, http.StatusUnauthorized, "User not authenticated")
