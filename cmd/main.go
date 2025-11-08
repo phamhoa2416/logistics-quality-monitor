@@ -78,9 +78,11 @@ func main() {
 
 	router := gin.Default()
 
-	// Add middleware in order: request ID, logging, CORS, request size limit, general rate limit
+	// Add middleware in order: request ID, logging, security headers, CORS, request size limit, general rate limit
+	router.Use(gin.Recovery())
 	router.Use(middleware.RequestIDMiddleware())
 	router.Use(middleware.LoggingMiddleware())
+	router.Use(middleware.SecurityHeadersMiddleware())
 	router.Use(middleware.CORSMiddleware(&cfg.CORS))
 	router.Use(middleware.RequestSizeLimitMiddleware(10 << 20))
 	router.Use(middleware.RateLimitMiddleware(cfg.RateLimit.GeneralRPS, cfg.RateLimit.GeneralBurst))
