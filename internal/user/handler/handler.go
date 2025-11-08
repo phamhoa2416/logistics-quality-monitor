@@ -12,6 +12,7 @@ import (
 	"logistics-quality-monitor/pkg/utils"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
 
@@ -31,6 +32,7 @@ func (h *UserHandler) RegisterRoutes(router *gin.RouterGroup) {
 		user.POST("/forgot-password", h.ForgotPassword)
 		user.POST("/reset-password", h.ResetPassword)
 		user.POST("/refresh", h.RefreshToken)
+		user.POST("/revoke", h.RevokeToken)
 	}
 }
 
@@ -40,6 +42,18 @@ func (h *UserHandler) Register(c *gin.Context) {
 	if err := c.ShouldBindJSON(&request); err != nil {
 		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body")
 		return
+	}
+
+	request.Email = utils.SanitizeEmail(request.Email)
+	request.Username = utils.SanitizeString(request.Username)
+	request.FullName = utils.SanitizeString(request.FullName)
+	if request.PhoneNumber != nil {
+		sanitized := utils.SanitizeString(*request.PhoneNumber)
+		request.PhoneNumber = &sanitized
+	}
+	if request.Address != nil {
+		sanitized := utils.SanitizeString(*request.Address)
+		request.Address = &sanitized
 	}
 
 	authResponse, err := h.service.Register(c.Request.Context(), &request)
@@ -59,6 +73,8 @@ func (h *UserHandler) Login(c *gin.Context) {
 		return
 	}
 
+	request.Email = utils.SanitizeEmail(request.Email)
+
 	authResponse, err := h.service.Login(c.Request.Context(), &request)
 	if err != nil {
 		respondWithError(c, err)
@@ -75,6 +91,8 @@ func (h *UserHandler) ForgotPassword(c *gin.Context) {
 		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body")
 		return
 	}
+
+	request.Email = utils.SanitizeEmail(request.Email)
 
 	if err := h.service.ForgotPassword(c.Request.Context(), &request); err != nil {
 		respondWithError(c, err)
@@ -118,6 +136,37 @@ func (h *UserHandler) RefreshToken(c *gin.Context) {
 	}
 
 	utils.SuccessResponse(c, http.StatusOK, "Token refreshed successfully", tokenPair)
+}
+
+func (h *UserHandler) RevokeToken(c *gin.Context) {
+	userID, exists := c.Get("userID")
+	if !exists {
+		utils.ErrorResponse(c, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	userUUID, ok := userID.(uuid.UUID)
+	if !ok {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Invalid user identifier")
+		return
+	}
+
+	refreshToken := c.GetHeader("Authorization")
+	if refreshToken == "" {
+		utils.ErrorResponse(c, http.StatusUnauthorized, "Refresh token required")
+		return
+	}
+
+	if len(refreshToken) > 7 && refreshToken[:7] == "Bearer " {
+		refreshToken = refreshToken[7:]
+	}
+
+	if err := h.service.RevokeToken(c.Request.Context(), userUUID, refreshToken); err != nil {
+		respondWithError(c, err)
+		return
+	}
+
+	utils.SuccessResponse(c, http.StatusOK, "Token revoked successfully", nil)
 }
 
 func respondWithError(c *gin.Context, err error) {
