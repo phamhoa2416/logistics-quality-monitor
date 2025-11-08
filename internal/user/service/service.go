@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"logistics-quality-monitor/internal/config"
+	"logistics-quality-monitor/internal/logger"
 	"logistics-quality-monitor/internal/user/model"
 	"logistics-quality-monitor/internal/user/repository"
 	appErrors "logistics-quality-monitor/pkg/errors"
@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 )
 
 type UserService struct {
@@ -41,6 +42,10 @@ func (s *UserService) Register(ctx context.Context, request *model.RegisterReque
 		return nil, fmt.Errorf("failed to check existing user: %w", err)
 	}
 	if existingUser != nil {
+		logger.Warn("Registration attempt with existing email",
+			zap.String("email", request.Email),
+			zap.String("event", "registration_failed_duplicate_email"),
+		)
 		return nil, appErrors.ErrUserAlreadyExists
 	}
 
@@ -75,6 +80,14 @@ func (s *UserService) Register(ctx context.Context, request *model.RegisterReque
 		return nil, fmt.Errorf("failed to generate tokens: %w", err)
 	}
 
+	logger.Info("User registered successfully",
+		zap.String("user_id", user.ID.String()),
+		zap.String("email", user.Email),
+		zap.String("username", user.Username),
+		zap.String("role", user.Role),
+		zap.String("event", "user_registered"),
+	)
+
 	return &model.AuthResponse{
 		User:         user.ToResponse(),
 		AccessToken:  tokenPair.AccessToken,
@@ -91,16 +104,30 @@ func (s *UserService) Login(ctx context.Context, request *model.LoginRequest) (*
 	user, err := s.repo.GetUserByEmail(ctx, request.Email)
 	if err != nil {
 		if errors.Is(err, appErrors.ErrUserNotFound) {
+			logger.Warn("Login attempt with non-existent email",
+				zap.String("email", request.Email),
+				zap.String("event", "user_not_found"),
+			)
 			return nil, appErrors.ErrInvalidCredentials
 		}
 		return nil, err
 	}
 
 	if !user.IsActive {
+		logger.Warn("Login attempt for inactive user",
+			zap.String("user_id", user.ID.String()),
+			zap.String("email", user.Email),
+			zap.String("event", "login_failed_inactive_user"),
+		)
 		return nil, appErrors.ErrUserInactive
 	}
 
 	if !utils.CheckPassword(user.PasswordHashed, request.Password) {
+		logger.Warn("Login attempt with invalid password",
+			zap.String("user_id", user.ID.String()),
+			zap.String("email", user.Email),
+			zap.String("event", "login_failed_invalid_password"),
+		)
 		return nil, appErrors.ErrInvalidCredentials
 	}
 
@@ -115,6 +142,13 @@ func (s *UserService) Login(ctx context.Context, request *model.LoginRequest) (*
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate tokens: %w", err)
 	}
+
+	logger.Info("User logged in successfully",
+		zap.String("user_id", user.ID.String()),
+		zap.String("email", user.Email),
+		zap.String("role", user.Role),
+		zap.String("event", "login_success"),
+	)
 
 	return &model.AuthResponse{
 		User:         user.ToResponse(),
@@ -132,7 +166,10 @@ func (s *UserService) ForgotPassword(ctx context.Context, request *model.ForgotP
 	user, err := s.repo.GetUserByEmail(ctx, request.Email)
 	if err != nil {
 		if errors.Is(err, appErrors.ErrUserNotFound) {
-			log.Printf("Password reset requested for non-existent email: %s", request.Email)
+			logger.Info("Password reset requested for non-existent email",
+				zap.String("email", request.Email),
+				zap.String("event", "password_reset_requested_non_existent_email"),
+			)
 			return nil
 		}
 		return fmt.Errorf("failed to retrieve user: %w", err)
@@ -148,11 +185,22 @@ func (s *UserService) ForgotPassword(ctx context.Context, request *model.ForgotP
 		return fmt.Errorf("failed to create reset token: %w", err)
 	}
 
+	logger.Info("Password reset token generated",
+		zap.String("user_id", user.ID.String()),
+		zap.String("email", user.Email),
+		zap.String("token_id", resetToken.ID.String()),
+		zap.Time("expires_at", resetToken.ExpiresAt),
+		zap.String("event", "password_reset_token_generated"),
+	)
+
 	// TODO: Send email with reset link
 	// For now, just log the token (in production, send via email)
-	log.Printf("Password reset token for %s: %s", user.Email, resetToken.Token)
-	log.Printf("Reset link: http://%s:%s/auth/reset-password?token=%s",
-		s.config.Server.Host, s.config.Server.Port, resetToken.Token)
+	logger.Debug("Password reset token details",
+		zap.String("email", user.Email),
+		zap.String("reset_token", resetToken.Token),
+		zap.String("reset_link", fmt.Sprintf("https://yourdomain.com/reset-password?token=%s", resetToken.Token)),
+		zap.String("event", "password_reset_token_details"),
+	)
 
 	return nil
 }
@@ -168,7 +216,17 @@ func (s *UserService) ResetPassword(ctx context.Context, request *model.ResetPas
 
 	resetToken, err := s.repo.GetPasswordResetToken(ctx, request.Token)
 	if err != nil {
+		logger.Warn("Password reset attempt with invalid token",
+			zap.String("token", request.Token),
+			zap.String("event", "password_reset_failed_invalid_token"),
+		)
 		return err
+	}
+	if resetToken.Used {
+		return appErrors.NewAppError("INVALID_TOKEN", "Token has already been used", nil)
+	}
+	if time.Now().After(resetToken.ExpiresAt) {
+		return appErrors.NewAppError("INVALID_TOKEN", "Token has expired", nil)
 	}
 
 	hashedPassword, err := utils.HashPassword(request.NewPassword)
@@ -181,8 +239,18 @@ func (s *UserService) ResetPassword(ctx context.Context, request *model.ResetPas
 	}
 
 	if err := s.repo.MarkTokenAsUsed(ctx, resetToken.ID); err != nil {
-		log.Printf("Failed to mark token as used: %v", err)
+		logger.Error("Failed to mark password reset token as used",
+			zap.String("user_id", resetToken.UserID.String()),
+			zap.String("token_id", resetToken.ID.String()),
+			zap.Error(err),
+		)
 	}
+
+	logger.Info("Password reset successfully",
+		zap.String("user_id", resetToken.UserID.String()),
+		zap.String("token_id", resetToken.ID.String()),
+		zap.String("event", "password_reset_success"),
+	)
 
 	return nil
 }
@@ -202,6 +270,11 @@ func (s *UserService) ChangePassword(ctx context.Context, userID uuid.UUID, requ
 	}
 
 	if !utils.CheckPassword(user.PasswordHashed, request.OldPassword) {
+		logger.Warn("Password change attempt with invalid old password",
+			zap.String("user_id", user.ID.String()),
+			zap.String("email", user.Email),
+			zap.String("event", "password_change_failed_invalid_old_password"),
+		)
 		return appErrors.ErrInvalidCredentials
 	}
 
@@ -210,7 +283,17 @@ func (s *UserService) ChangePassword(ctx context.Context, userID uuid.UUID, requ
 		return fmt.Errorf("failed to hash password: %w", err)
 	}
 
-	return s.repo.UpdatePassword(ctx, userID, hashedPassword)
+	if err := s.repo.UpdatePassword(ctx, userID, hashedPassword); err != nil {
+		return err
+	}
+
+	logger.Info("Password changed successfully",
+		zap.String("user_id", user.ID.String()),
+		zap.String("email", user.Email),
+		zap.String("event", "password_change_success"),
+	)
+
+	return nil
 }
 
 func (s *UserService) GetProfile(ctx context.Context, userID uuid.UUID) (*model.UserResponse, error) {
@@ -252,6 +335,10 @@ func (s *UserService) UpdateProfile(ctx context.Context, userID uuid.UUID, reque
 func (s *UserService) RefreshToken(ctx context.Context, refreshToken string) (*utils.TokenPair, error) {
 	claims, err := utils.ValidateToken(refreshToken, s.config.JWT.Secret)
 	if err != nil {
+		logger.Warn("Token refresh attempt with invalid token",
+			zap.String("event", "token_refresh_failed_invalid_token"),
+			zap.Error(err),
+		)
 		return nil, appErrors.ErrInvalidToken
 	}
 
@@ -266,6 +353,12 @@ func (s *UserService) RefreshToken(ctx context.Context, refreshToken string) (*u
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate tokens: %w", err)
 	}
+
+	logger.Debug("Token refresh successfully",
+		zap.String("user_id", claims.UserID.String()),
+		zap.String("email", claims.Email),
+		zap.String("event", "token_refresh_success"),
+	)
 
 	return tokenPair, nil
 }

@@ -2,16 +2,17 @@ package service
 
 import (
 	"context"
-	"log"
 	"logistics-quality-monitor/internal/config"
 	"logistics-quality-monitor/internal/device/model"
 	"logistics-quality-monitor/internal/device/repository"
 	deviceValidator "logistics-quality-monitor/internal/device/validator"
+	"logistics-quality-monitor/internal/logger"
 	userRepository "logistics-quality-monitor/internal/user/repository"
 	appErrors "logistics-quality-monitor/pkg/errors"
 	"logistics-quality-monitor/pkg/utils"
 
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 )
 
 type DeviceService struct {
@@ -61,7 +62,11 @@ func (s *DeviceService) CreateDevice(ctx context.Context, request *model.CreateD
 		return nil, err
 	}
 
-	log.Printf("Device created: %s (ID: %s)", createdDevice.HardwareUID, createdDevice.ID)
+	logger.Info("Device created",
+		zap.String("device_id", createdDevice.ID.String()),
+		zap.String("hardware_uid", createdDevice.HardwareUID),
+		zap.String("event", "device_created"),
+	)
 
 	return createdDevice.ToResponse(), nil
 }
@@ -161,7 +166,11 @@ func (s *DeviceService) UpdateDevice(ctx context.Context, deviceID uuid.UUID, re
 		return nil, err
 	}
 
-	log.Printf("Device updated: %s (ID: %s)", updatedDevice.HardwareUID, updatedDevice.ID)
+	logger.Info("Device updated",
+		zap.String("device_id", updatedDevice.ID.String()),
+		zap.String("hardware_uid", updatedDevice.HardwareUID),
+		zap.String("event", "device_updated"),
+	)
 
 	return updatedDevice.ToResponse(), nil
 }
@@ -193,7 +202,11 @@ func (s *DeviceService) AssignOwner(ctx context.Context, deviceID uuid.UUID, req
 		return nil, err
 	}
 
-	log.Printf("Device %s assigned to shipper %s", deviceID, req.OwnerShipperID)
+	logger.Info("Device assigned to shipper",
+		zap.String("device_id", deviceID.String()),
+		zap.String("shipper_id", req.OwnerShipperID.String()),
+		zap.String("event", "device_assigned"),
+	)
 
 	return updatedDevice.ToResponse(), nil
 }
@@ -221,7 +234,11 @@ func (s *DeviceService) UnassignOwner(ctx context.Context, deviceID uuid.UUID, r
 		return nil, err
 	}
 
-	log.Printf("Device %s unassigned (reason: %s)", deviceID, req.Reason)
+	logger.Info("Device unassigned",
+		zap.String("device_id", deviceID.String()),
+		zap.String("reason", req.Reason),
+		zap.String("event", "device_unassigned"),
+	)
 
 	return updatedDevice.ToResponse(), nil
 }
@@ -249,8 +266,13 @@ func (s *DeviceService) UpdateStatus(ctx context.Context, deviceID uuid.UUID, re
 		return nil, err
 	}
 
-	log.Printf("Device %s status changed: %s -> %s (reason: %s)",
-		deviceID, device.Status, req.Status, req.Reason)
+	logger.Info("Device status changed",
+		zap.String("device_id", deviceID.String()),
+		zap.String("old_status", string(device.Status)),
+		zap.String("new_status", string(req.Status)),
+		zap.String("reason", req.Reason),
+		zap.String("event", "device_status_changed"),
+	)
 
 	return updatedDevice.ToResponse(), nil
 }
@@ -292,7 +314,10 @@ func (s *DeviceService) DeleteDevice(ctx context.Context, deviceID uuid.UUID) er
 		return err
 	}
 
-	log.Printf("Device %s marked as retired", deviceID)
+	logger.Info("Device marked as retired",
+		zap.String("device_id", deviceID.String()),
+		zap.String("event", "device_retired"),
+	)
 
 	return nil
 }
@@ -344,8 +369,11 @@ func (s *DeviceService) BulkAssignOwner(ctx context.Context, req *model.BulkAssi
 		}
 	}
 
-	log.Printf("Bulk assignment completed: %d success, %d failed",
-		response.SuccessCount, response.FailedCount)
+	logger.Info("Bulk assignment completed",
+		zap.Int("success_count", response.SuccessCount),
+		zap.Int("failed_count", response.FailedCount),
+		zap.String("event", "bulk_assignment_completed"),
+	)
 
 	return response, nil
 }

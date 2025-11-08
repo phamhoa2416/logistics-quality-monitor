@@ -2,15 +2,17 @@ package handler
 
 import (
 	"errors"
-	"log"
 	"net/http"
 
+	"logistics-quality-monitor/internal/logger"
+	"logistics-quality-monitor/internal/middleware"
 	"logistics-quality-monitor/internal/user/model"
 	"logistics-quality-monitor/internal/user/service"
 	appErrors "logistics-quality-monitor/pkg/errors"
 	"logistics-quality-monitor/pkg/utils"
 
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
 type UserHandler struct {
@@ -149,7 +151,13 @@ func respondWithError(c *gin.Context, err error) {
 			return
 		}
 
-		log.Printf("internal error: %v", err)
+		requestID := middleware.GetRequestID(c)
+		logger.Error("Internal server error",
+			zap.String("request_id", requestID),
+			zap.String("path", c.Request.URL.Path),
+			zap.String("method", c.Request.Method),
+			zap.Error(err),
+		)
 		utils.ErrorResponse(c, http.StatusInternalServerError, "Internal server error")
 	}
 }
