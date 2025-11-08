@@ -17,14 +17,16 @@ import (
 )
 
 type UserService struct {
-	repo   *repository.UserRepository
-	config *config.Config
+	repo        *repository.UserRepository
+	refreshRepo *repository.RefreshTokenRepository
+	config      *config.Config
 }
 
-func NewService(repo *repository.UserRepository, cfg *config.Config) *UserService {
+func NewService(repo *repository.UserRepository, refreshRepo *repository.RefreshTokenRepository, cfg *config.Config) *UserService {
 	return &UserService{
-		repo:   repo,
-		config: cfg,
+		repo:        repo,
+		refreshRepo: refreshRepo,
+		config:      cfg,
 	}
 }
 
@@ -78,6 +80,15 @@ func (s *UserService) Register(ctx context.Context, request *model.RegisterReque
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate tokens: %w", err)
+	}
+
+	refreshToken := &model.RefreshToken{
+		UserID:    user.ID,
+		Token:     tokenPair.RefreshToken,
+		ExpiresAt: time.Now().Add(time.Duration(s.config.JWT.RefreshExpiryHours) * time.Hour),
+	}
+	if err := s.refreshRepo.CreateRefreshToken(ctx, refreshToken); err != nil {
+		return nil, fmt.Errorf("failed to store refresh token: %w", err)
 	}
 
 	logger.Info("User registered successfully",
@@ -141,6 +152,15 @@ func (s *UserService) Login(ctx context.Context, request *model.LoginRequest) (*
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate tokens: %w", err)
+	}
+
+	refreshToken := &model.RefreshToken{
+		UserID:    user.ID,
+		Token:     tokenPair.RefreshToken,
+		ExpiresAt: time.Now().Add(time.Duration(s.config.JWT.RefreshExpiryHours) * time.Hour),
+	}
+	if err := s.refreshRepo.CreateRefreshToken(ctx, refreshToken); err != nil {
+		return nil, fmt.Errorf("failed to store refresh token: %w", err)
 	}
 
 	logger.Info("User logged in successfully",
@@ -333,6 +353,7 @@ func (s *UserService) UpdateProfile(ctx context.Context, userID uuid.UUID, reque
 }
 
 func (s *UserService) RefreshToken(ctx context.Context, refreshToken string) (*utils.TokenPair, error) {
+	// Validate JWT token
 	claims, err := utils.ValidateToken(refreshToken, s.config.JWT.Secret)
 	if err != nil {
 		logger.Warn("Token refresh attempt with invalid token",
@@ -342,6 +363,35 @@ func (s *UserService) RefreshToken(ctx context.Context, refreshToken string) (*u
 		return nil, appErrors.ErrInvalidToken
 	}
 
+	// Check if refresh token exists in DB and is valid
+	dbToken, err := s.refreshRepo.GetRefreshToken(ctx, refreshToken)
+	if err != nil {
+		logger.Warn("Token refresh attempt with non-existent or invalid token",
+			zap.String("user_id", claims.UserID.String()),
+			zap.String("event", "token_refresh_failed_token_not_found"),
+		)
+		return nil, appErrors.ErrInvalidToken
+	}
+
+	// Verify token belongs to the user from JWT claims
+	if dbToken.UserID != claims.UserID {
+		logger.Warn("Token refresh attempt with mismatched user ID",
+			zap.String("token_user_id", dbToken.UserID.String()),
+			zap.String("claim_user_id", claims.UserID.String()),
+			zap.String("event", "token_refresh_failed_user_mismatch"),
+		)
+		return nil, appErrors.ErrInvalidToken
+	}
+
+	// Revoke the old refresh token
+	if err := s.refreshRepo.RevokeToken(ctx, dbToken.ID); err != nil {
+		logger.Error("Failed to revoke refresh token",
+			zap.String("token_id", dbToken.ID.String()),
+			zap.Error(err),
+		)
+	}
+
+	// Generate new token pair
 	tokenPair, err := utils.GenerateTokenPair(
 		claims.UserID,
 		claims.Email,
@@ -354,11 +404,58 @@ func (s *UserService) RefreshToken(ctx context.Context, refreshToken string) (*u
 		return nil, fmt.Errorf("failed to generate tokens: %w", err)
 	}
 
+	// Store the new refresh token
+	newRefreshToken := &model.RefreshToken{
+		UserID:    claims.UserID,
+		Token:     tokenPair.RefreshToken,
+		ExpiresAt: time.Now().Add(time.Duration(s.config.JWT.RefreshExpiryHours) * time.Hour),
+	}
+	if err := s.refreshRepo.CreateRefreshToken(ctx, newRefreshToken); err != nil {
+		return nil, fmt.Errorf("failed to store refresh token: %w", err)
+	}
+
 	logger.Debug("Token refresh successfully",
 		zap.String("user_id", claims.UserID.String()),
 		zap.String("email", claims.Email),
+		zap.String("old_token_id", dbToken.ID.String()),
+		zap.String("new_token_id", newRefreshToken.ID.String()),
 		zap.String("event", "token_refresh_success"),
 	)
 
 	return tokenPair, nil
+}
+
+func (s *UserService) RevokeToken(ctx context.Context, userID uuid.UUID, refreshToken string) error {
+	dbToken, err := s.refreshRepo.GetRefreshToken(ctx, refreshToken)
+	if err != nil {
+		return appErrors.ErrInvalidToken
+	}
+
+	if dbToken.UserID != userID {
+		return appErrors.ErrInvalidToken
+	}
+
+	if err := s.refreshRepo.RevokeToken(ctx, dbToken.ID); err != nil {
+		return fmt.Errorf("failed to revoke token: %w", err)
+	}
+
+	logger.Info("Refresh token revoked successfully",
+		zap.String("user_id", userID.String()),
+		zap.String("token_id", dbToken.ID.String()),
+		zap.String("event", "token_revoked"),
+	)
+
+	return nil
+}
+func (s *UserService) RevokeAllUserTokens(ctx context.Context, userID uuid.UUID) error {
+	if err := s.refreshRepo.RevokeAllUserTokens(ctx, userID); err != nil {
+		return fmt.Errorf("failed to revoke all tokens for user: %w", err)
+	}
+
+	logger.Info("All refresh tokens revoked for user",
+		zap.String("user_id", userID.String()),
+		zap.String("event", "all_tokens_revoked"),
+	)
+
+	return nil
 }
