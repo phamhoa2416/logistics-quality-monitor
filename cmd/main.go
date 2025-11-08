@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"logistics-quality-monitor/internal/logger"
 	"net"
 	"net/http"
 	"os"
@@ -19,34 +20,50 @@ import (
 	"logistics-quality-monitor/internal/user/service"
 
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
 func main() {
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("Failed to load configuration: %v", err)
+		os.Stderr.WriteString("Failed to load configuration: " + err.Error() + "\n")
+		os.Exit(1)
 	}
 
+	env := cfg.Server.Environment
+	if env == "" {
+		env = "development"
+	}
+	if err := logger.Init(env); err != nil {
+		os.Stderr.WriteString("Failed to initialize logger: " + err.Error() + "\n")
+		os.Exit(1)
+	}
+	defer logger.Sync()
+
+	logger.Info("Starting application",
+		zap.String("environment", env),
+	)
+
 	if cfg.Database.Host == "" || cfg.Database.DBName == "" {
-		log.Fatal("Database configuration is missing. Please set DB_HOST and DB_NAME environment variables.")
+		logger.Fatal("Database configuration is missing. Please set DB_HOST and DB_NAME environment variables.")
 	}
 	if cfg.JWT.Secret == "" {
-		log.Fatal("JWT secret is missing. Please set JWT_SECRET environment variable.")
+		logger.Fatal("JWT secret is missing. Please set JWT_SECRET environment variable.")
 	}
 
 	db, err := database.NewDatabase(cfg)
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		logger.Fatal("Failed to connect to database: %v", zap.Error(err))
 	}
 	defer func() {
 		if err := db.Close(); err != nil {
-			log.Printf("Failed to close database connection: %v", err)
+			logger.Error("Failed to close database connection: %v", zap.Error(err))
 		}
 	}()
 
-	authRepository := repository.NewRepository(db)
-	authService := service.NewService(authRepository, cfg)
-	authHandler := handler.NewHandler(authService)
+	userRepository := repository.NewRepository(db)
+	userService := service.NewService(userRepository, cfg)
+	userHandler := handler.NewHandler(userService)
 
 	// Set Gin mode based on environment
 	if cfg.Server.Environment == "production" {
@@ -55,6 +72,8 @@ func main() {
 
 	router := gin.Default()
 
+	router.Use(middleware.RequestIDMiddleware())
+	router.Use(middleware.LoggingMiddleware())
 	router.Use(corsMiddleware())
 
 	router.GET("/health", func(c *gin.Context) {
@@ -74,12 +93,12 @@ func main() {
 
 	v1 := router.Group("/api/v1")
 	{
-		authHandler.RegisterRoutes(v1)
+		userHandler.RegisterRoutes(v1)
 
 		protected := v1.Group("")
 		protected.Use(middleware.AuthMiddleware(cfg))
 		{
-			authHandler.RegisterProfileRoutes(protected)
+			userHandler.RegisterProfileRoutes(protected)
 
 			admin := protected.Group("/admin")
 			admin.Use(middleware.AdminOnly())
@@ -113,9 +132,11 @@ func main() {
 
 	// Start goroutine
 	go func() {
-		log.Printf("Server starting on %s", addr)
+		logger.Info("Server starting",
+			zap.String("address", addr),
+		)
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Fatalf("Failed to start server: %v", err)
+			logger.Fatal("Failed to start server", zap.Error(err))
 		}
 	}()
 
@@ -123,14 +144,14 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	log.Println("Shutting down server...")
+	logger.Info("Shutdown Server ...")
 
 	// Graceful shutdown with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	if err := server.Shutdown(ctx); err != nil {
-		log.Fatalf("Server forced to shutdown: %v", err)
+		logger.Fatal("Failed to shutdown server", zap.Error(err))
 	}
 
 	log.Println("Server exited properly")
