@@ -11,12 +11,12 @@ import (
 	"syscall"
 	"time"
 
-	"logistics-quality-monitor/internal/auth/handler"
-	"logistics-quality-monitor/internal/auth/repository"
-	"logistics-quality-monitor/internal/auth/service"
 	"logistics-quality-monitor/internal/config"
 	"logistics-quality-monitor/internal/database"
 	"logistics-quality-monitor/internal/middleware"
+	"logistics-quality-monitor/internal/user/handler"
+	"logistics-quality-monitor/internal/user/repository"
+	"logistics-quality-monitor/internal/user/service"
 
 	"github.com/gin-gonic/gin"
 )
