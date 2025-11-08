@@ -2,14 +2,15 @@ package database
 
 import (
 	"fmt"
-	"log"
 	"logistics-quality-monitor/internal/config"
+	"logistics-quality-monitor/internal/logger"
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
+	gormLogger "gorm.io/gorm/logger"
 )
 
 type Database struct {
@@ -19,8 +20,15 @@ type Database struct {
 func NewDatabase(cfg *config.Config) (*Database, error) {
 	dsn := cfg.Database.DSN()
 
+	var gormLogLevel gormLogger.LogLevel
+	if cfg.Server.Environment == "production" {
+		gormLogLevel = gormLogger.Warn
+	} else {
+		gormLogLevel = gormLogger.Info
+	}
+
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Info), // In log SQL ra terminal
+		Logger: gormLogger.Default.LogMode(gormLogLevel),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("error opening database: %w", err)
@@ -39,7 +47,12 @@ func NewDatabase(cfg *config.Config) (*Database, error) {
 		return nil, fmt.Errorf("error connecting to database: %w", err)
 	}
 
-	log.Println("Data connection established")
+	logger.Info("Database connection established",
+		zap.String("host", cfg.Database.Host),
+		zap.String("database", cfg.Database.DBName),
+		zap.Int("max_open_connections", 25),
+		zap.Int("max_idle_connections", 5),
+	)
 
 	return &Database{DB: db}, nil
 }

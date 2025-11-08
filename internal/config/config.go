@@ -10,10 +10,12 @@ import (
 )
 
 type Config struct {
-	Server   ServerConfig
-	Database DatabaseConfig
-	JWT      JWTConfig
-	SMTP     SMTPConfig
+	Server    ServerConfig
+	Database  DatabaseConfig
+	JWT       JWTConfig
+	SMTP      SMTPConfig
+	RateLimit RateLimitConfig
+	CORS      CORSConfig
 }
 
 type ServerConfig struct {
@@ -43,6 +45,20 @@ type SMTPConfig struct {
 	User     string
 	Password string
 	From     string
+}
+
+type RateLimitConfig struct {
+	GeneralRPS   float64 // Requests per second for general endpoints
+	GeneralBurst int     // Burst size for general endpoints
+}
+
+type CORSConfig struct {
+	AllowedOrigins   []string
+	AllowedMethods   []string
+	AllowedHeaders   []string
+	ExposedHeaders   []string
+	AllowCredentials bool
+	MaxAge           int
 }
 
 func Load() (*Config, error) {
@@ -86,6 +102,18 @@ func Load() (*Config, error) {
 			User:     viper.GetString("SMTP_USER"),
 			Password: viper.GetString("SMTP_PASSWORD"),
 			From:     viper.GetString("SMTP_FROM"),
+		},
+		RateLimit: RateLimitConfig{
+			GeneralRPS:   viper.GetFloat64("RATE_LIMIT_GENERAL_RPS"),
+			GeneralBurst: viper.GetInt("RATE_LIMIT_GENERAL_BURST"),
+		},
+		CORS: CORSConfig{
+			AllowedOrigins:   viper.GetStringSlice("CORS_ALLOWED_ORIGINS"),
+			AllowedMethods:   viper.GetStringSlice("CORS_ALLOWED_METHODS"),
+			AllowedHeaders:   viper.GetStringSlice("CORS_ALLOWED_HEADERS"),
+			ExposedHeaders:   viper.GetStringSlice("CORS_EXPOSED_HEADERS"),
+			AllowCredentials: viper.GetBool("CORS_ALLOW_CREDENTIALS"),
+			MaxAge:           viper.GetInt("CORS_MAX_AGE"),
 		},
 	}
 

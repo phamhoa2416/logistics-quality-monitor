@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"logistics-quality-monitor/internal/logger"
 	"net"
 	"net/http"
 	"os"
@@ -11,42 +12,64 @@ import (
 	"syscall"
 	"time"
 
-	"logistics-quality-monitor/internal/auth/handler"
-	"logistics-quality-monitor/internal/auth/repository"
-	"logistics-quality-monitor/internal/auth/service"
 	"logistics-quality-monitor/internal/config"
 	"logistics-quality-monitor/internal/database"
 	"logistics-quality-monitor/internal/middleware"
+	"logistics-quality-monitor/internal/user/handler"
+	"logistics-quality-monitor/internal/user/repository"
+	"logistics-quality-monitor/internal/user/service"
 
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
 func main() {
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("Failed to load configuration: %v", err)
+		os.Stderr.WriteString("Failed to load configuration: " + err.Error() + "\n")
+		os.Exit(1)
 	}
 
+	env := cfg.Server.Environment
+	if env == "" {
+		env = "development"
+	}
+	if err := logger.Init(env); err != nil {
+		os.Stderr.WriteString("Failed to initialize logger: " + err.Error() + "\n")
+		os.Exit(1)
+	}
+	defer logger.Sync()
+
+	logger.Info("Starting application",
+		zap.String("environment", env),
+	)
+
 	if cfg.Database.Host == "" || cfg.Database.DBName == "" {
-		log.Fatal("Database configuration is missing. Please set DB_HOST and DB_NAME environment variables.")
+		logger.Fatal("Database configuration is missing. Please set DB_HOST and DB_NAME environment variables.")
 	}
 	if cfg.JWT.Secret == "" {
-		log.Fatal("JWT secret is missing. Please set JWT_SECRET environment variable.")
+		logger.Fatal("JWT secret is missing. Please set JWT_SECRET environment variable.")
 	}
 
 	db, err := database.NewDatabase(cfg)
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		logger.Fatal("Failed to connect to database: %v", zap.Error(err))
 	}
 	defer func() {
 		if err := db.Close(); err != nil {
-			log.Printf("Failed to close database connection: %v", err)
+			logger.Error("Failed to close database connection: %v", zap.Error(err))
 		}
 	}()
 
-	authRepository := repository.NewRepository(db)
-	authService := service.NewService(authRepository, cfg)
-	authHandler := handler.NewHandler(authService)
+	userRepository := repository.NewRepository(db)
+	refreshTokenRepository := repository.NewRefreshTokenRepository(db)
+	userService := service.NewService(userRepository, refreshTokenRepository, cfg)
+	userHandler := handler.NewHandler(userService)
+
+	// Start token cleanup job
+	cleanupCtx, cleanupCancel := context.WithCancel(context.Background())
+	defer cleanupCancel()
+	go userService.StartTokenCleanupJob(cleanupCtx, 1*time.Hour)
 
 	// Set Gin mode based on environment
 	if cfg.Server.Environment == "production" {
@@ -55,7 +78,14 @@ func main() {
 
 	router := gin.Default()
 
-	router.Use(corsMiddleware())
+	// Add middleware in order: request ID, logging, security headers, CORS, request size limit, general rate limit
+	router.Use(gin.Recovery())
+	router.Use(middleware.RequestIDMiddleware())
+	router.Use(middleware.LoggingMiddleware())
+	router.Use(middleware.SecurityHeadersMiddleware())
+	router.Use(middleware.CORSMiddleware(&cfg.CORS))
+	router.Use(middleware.RequestSizeLimitMiddleware(10 << 20))
+	router.Use(middleware.RateLimitMiddleware(cfg.RateLimit.GeneralRPS, cfg.RateLimit.GeneralBurst))
 
 	router.GET("/health", func(c *gin.Context) {
 		if err := db.Health(); err != nil {
@@ -74,12 +104,13 @@ func main() {
 
 	v1 := router.Group("/api/v1")
 	{
-		authHandler.RegisterRoutes(v1)
+		userHandler.RegisterRoutes(v1)
 
 		protected := v1.Group("")
 		protected.Use(middleware.AuthMiddleware(cfg))
 		{
-			authHandler.RegisterProfileRoutes(protected)
+			userHandler.RegisterProfileRoutes(protected)
+			protected.POST("/revoke", userHandler.RevokeToken)
 
 			admin := protected.Group("/admin")
 			admin.Use(middleware.AdminOnly())
@@ -113,9 +144,11 @@ func main() {
 
 	// Start goroutine
 	go func() {
-		log.Printf("Server starting on %s", addr)
+		logger.Info("Server starting",
+			zap.String("address", addr),
+		)
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Fatalf("Failed to start server: %v", err)
+			logger.Fatal("Failed to start server", zap.Error(err))
 		}
 	}()
 
@@ -123,41 +156,15 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	log.Println("Shutting down server...")
+	logger.Info("Shutdown Server ...")
 
 	// Graceful shutdown with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	if err := server.Shutdown(ctx); err != nil {
-		log.Fatalf("Server forced to shutdown: %v", err)
+		logger.Fatal("Failed to shutdown server", zap.Error(err))
 	}
 
 	log.Println("Server exited properly")
-}
-
-func corsMiddleware() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		headers := c.Writer.Header()
-		origin := c.GetHeader("Origin")
-
-		headers.Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-		headers.Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		headers.Set("Vary", "Origin")
-
-		if origin == "" {
-			headers.Set("Access-Control-Allow-Origin", "*")
-			headers.Del("Access-Control-Allow-Credentials")
-		} else {
-			headers.Set("Access-Control-Allow-Origin", origin)
-			headers.Set("Access-Control-Allow-Credentials", "true")
-		}
-
-		if c.Request.Method == http.MethodOptions {
-			c.AbortWithStatus(http.StatusNoContent)
-			return
-		}
-
-		c.Next()
-	}
 }

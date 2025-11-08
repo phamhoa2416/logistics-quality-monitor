@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"logistics-quality-monitor/internal/auth/models"
+	"logistics-quality-monitor/internal/user/model"
 	"logistics-quality-monitor/pkg/utils"
 	"net/http"
 
@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func (h *Handler) RegisterProfileRoutes(router *gin.RouterGroup) {
+func (h *UserHandler) RegisterProfileRoutes(router *gin.RouterGroup) {
 	profile := router.Group("/profile")
 	{
 		profile.GET("", h.GetProfile)
@@ -18,7 +18,7 @@ func (h *Handler) RegisterProfileRoutes(router *gin.RouterGroup) {
 	}
 }
 
-func (h *Handler) GetProfile(c *gin.Context) {
+func (h *UserHandler) GetProfile(c *gin.Context) {
 	userID, exists := c.Get("userID")
 	if !exists {
 		utils.ErrorResponse(c, http.StatusUnauthorized, "User not authenticated")
@@ -40,17 +40,30 @@ func (h *Handler) GetProfile(c *gin.Context) {
 	utils.SuccessResponse(c, http.StatusOK, "Profile retrieved successfully", profile)
 }
 
-func (h *Handler) UpdateProfile(c *gin.Context) {
+func (h *UserHandler) UpdateProfile(c *gin.Context) {
 	userID, exists := c.Get("userID")
 	if !exists {
 		utils.ErrorResponse(c, http.StatusUnauthorized, "User not authenticated")
 		return
 	}
 
-	var req models.UpdateProfileRequest
+	var req model.UpdateProfileRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body")
 		return
+	}
+
+	if req.FullName != nil {
+		sanitized := utils.SanitizeString(*req.FullName)
+		req.FullName = &sanitized
+	}
+	if req.PhoneNumber != nil {
+		sanitized := utils.SanitizePhone(*req.PhoneNumber)
+		req.PhoneNumber = &sanitized
+	}
+	if req.Address != nil {
+		sanitized := utils.SanitizeText(*req.Address)
+		req.Address = &sanitized
 	}
 
 	userUUID, ok := userID.(uuid.UUID)
@@ -68,14 +81,14 @@ func (h *Handler) UpdateProfile(c *gin.Context) {
 	utils.SuccessResponse(c, http.StatusOK, "Profile updated successfully", profile)
 }
 
-func (h *Handler) ChangePassword(c *gin.Context) {
+func (h *UserHandler) ChangePassword(c *gin.Context) {
 	userID, exists := c.Get("userID")
 	if !exists {
 		utils.ErrorResponse(c, http.StatusUnauthorized, "User not authenticated")
 		return
 	}
 
-	var req models.ChangePasswordRequest
+	var req model.ChangePasswordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid request body")
 		return
