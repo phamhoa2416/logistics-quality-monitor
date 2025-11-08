@@ -59,6 +59,7 @@ func (r *DeviceRepository) GetDeviceByID(ctx context.Context, deviceID uuid.UUID
 func (r *DeviceRepository) GetDeviceByHardwareUID(ctx context.Context, hardwareUID string) (*model.Device, error) {
 	var device model.Device
 	err := r.db.DB.WithContext(ctx).
+		Preload("OwnerShipper").
 		Where("hardware_uid = ?", hardwareUID).
 		First(&device).Error
 
@@ -221,7 +222,7 @@ func (r *DeviceRepository) GetStatistics(ctx context.Context) (*model.DeviceStat
 	var ownerStats []model.OwnerStats
 	err = r.db.DB.WithContext(ctx).Raw(`
         SELECT 
-            u.id, u.full_name, COUNT(d.id) as device_count
+            u.id::text as owner_id, u.full_name as owner_name, COUNT(d.id) as device_count
         FROM users u
         LEFT JOIN devices d ON u.id = d.owner_shipper_id
         WHERE u.role = 'shipper'
