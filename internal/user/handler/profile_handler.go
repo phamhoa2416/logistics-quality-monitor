@@ -53,6 +53,19 @@ func (h *UserHandler) UpdateProfile(c *gin.Context) {
 		return
 	}
 
+	if req.FullName != nil {
+		sanitized := utils.SanitizeString(*req.FullName)
+		req.FullName = &sanitized
+	}
+	if req.PhoneNumber != nil {
+		sanitized := utils.SanitizeString(*req.PhoneNumber)
+		req.PhoneNumber = &sanitized
+	}
+	if req.Address != nil {
+		sanitized := utils.SanitizeString(*req.Address)
+		req.Address = &sanitized
+	}
+
 	userUUID, ok := userID.(uuid.UUID)
 	if !ok {
 		utils.ErrorResponse(c, http.StatusInternalServerError, "Invalid user identifier")
