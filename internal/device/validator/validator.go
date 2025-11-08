@@ -35,7 +35,7 @@ func ValidateDeviceStatus(currentStatus, newStatus model.DeviceStatus) error {
 		model.StatusRetired:     {},
 	}
 
-	allowedStatus, exists := validTransitions[newStatus]
+	allowedStatus, exists := validTransitions[currentStatus]
 	if !exists {
 		return fmt.Errorf("invalid current status: %s", currentStatus)
 	}
