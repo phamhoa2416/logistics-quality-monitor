@@ -62,8 +62,14 @@ func main() {
 	}()
 
 	userRepository := repository.NewRepository(db)
-	userService := service.NewService(userRepository, cfg)
+	refreshTokenRepository := repository.NewRefreshTokenRepository(db)
+	userService := service.NewService(userRepository, refreshTokenRepository, cfg)
 	userHandler := handler.NewHandler(userService)
+
+	// Start token cleanup job
+	cleanupCtx, cleanupCancel := context.WithCancel(context.Background())
+	defer cleanupCancel()
+	go userService.StartTokenCleanupJob(cleanupCtx, 1*time.Hour)
 
 	// Set Gin mode based on environment
 	if cfg.Server.Environment == "production" {
@@ -72,9 +78,12 @@ func main() {
 
 	router := gin.Default()
 
+	// Add middleware in order: request ID, logging, CORS, request size limit, general rate limit
 	router.Use(middleware.RequestIDMiddleware())
 	router.Use(middleware.LoggingMiddleware())
-	router.Use(corsMiddleware())
+	router.Use(middleware.CORSMiddleware(&cfg.CORS))
+	router.Use(middleware.RequestSizeLimitMiddleware(10 << 20))
+	router.Use(middleware.RateLimitMiddleware(cfg.RateLimit.GeneralRPS, cfg.RateLimit.GeneralBurst))
 
 	router.GET("/health", func(c *gin.Context) {
 		if err := db.Health(); err != nil {
@@ -99,6 +108,7 @@ func main() {
 		protected.Use(middleware.AuthMiddleware(cfg))
 		{
 			userHandler.RegisterProfileRoutes(protected)
+			protected.POST("/revoke", userHandler.RevokeToken)
 
 			admin := protected.Group("/admin")
 			admin.Use(middleware.AdminOnly())
@@ -155,30 +165,4 @@ func main() {
 	}
 
 	log.Println("Server exited properly")
-}
-
-func corsMiddleware() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		headers := c.Writer.Header()
-		origin := c.GetHeader("Origin")
-
-		headers.Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-		headers.Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		headers.Set("Vary", "Origin")
-
-		if origin == "" {
-			headers.Set("Access-Control-Allow-Origin", "*")
-			headers.Del("Access-Control-Allow-Credentials")
-		} else {
-			headers.Set("Access-Control-Allow-Origin", origin)
-			headers.Set("Access-Control-Allow-Credentials", "true")
-		}
-
-		if c.Request.Method == http.MethodOptions {
-			c.AbortWithStatus(http.StatusNoContent)
-			return
-		}
-
-		c.Next()
-	}
 }
