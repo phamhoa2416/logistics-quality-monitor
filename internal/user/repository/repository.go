@@ -14,15 +14,15 @@ import (
 	"gorm.io/gorm"
 )
 
-type Repository struct {
+type UserRepository struct {
 	db *database.Database
 }
 
-func NewRepository(db *database.Database) *Repository {
-	return &Repository{db: db}
+func NewRepository(db *database.Database) *UserRepository {
+	return &UserRepository{db: db}
 }
 
-func (r *Repository) CreateUser(ctx context.Context, user *model.User) error {
+func (r *UserRepository) CreateUser(ctx context.Context, user *model.User) error {
 	user.ID = uuid.New()
 	user.CreatedAt = time.Now()
 	user.UpdatedAt = time.Now()
@@ -39,7 +39,7 @@ func (r *Repository) CreateUser(ctx context.Context, user *model.User) error {
 	return nil
 }
 
-func (r *Repository) GetUserByEmail(ctx context.Context, email string) (*model.User, error) {
+func (r *UserRepository) GetUserByEmail(ctx context.Context, email string) (*model.User, error) {
 	var user model.User
 	err := r.db.DB.WithContext(ctx).Where("email = ?", email).First(&user).Error
 
@@ -52,7 +52,7 @@ func (r *Repository) GetUserByEmail(ctx context.Context, email string) (*model.U
 	return &user, nil
 }
 
-func (r *Repository) GetUserByID(ctx context.Context, userID uuid.UUID) (*model.User, error) {
+func (r *UserRepository) GetUserByID(ctx context.Context, userID uuid.UUID) (*model.User, error) {
 	var user model.User
 	err := r.db.DB.WithContext(ctx).First(&user, "id = ?", userID).Error
 
@@ -65,7 +65,7 @@ func (r *Repository) GetUserByID(ctx context.Context, userID uuid.UUID) (*model.
 	return &user, nil
 }
 
-func (r *Repository) UpdateUser(ctx context.Context, user *model.User) error {
+func (r *UserRepository) UpdateUser(ctx context.Context, user *model.User) error {
 	user.UpdatedAt = time.Now()
 
 	result := r.db.DB.WithContext(ctx).Model(&model.User{}).
@@ -88,7 +88,7 @@ func (r *Repository) UpdateUser(ctx context.Context, user *model.User) error {
 	return nil
 }
 
-func (r *Repository) UpdatePassword(ctx context.Context, userID uuid.UUID, passwordHash string) error {
+func (r *UserRepository) UpdatePassword(ctx context.Context, userID uuid.UUID, passwordHash string) error {
 	result := r.db.DB.WithContext(ctx).Model(&model.User{}).
 		Where("id = ?", userID).
 		Updates(map[string]interface{}{
@@ -105,7 +105,7 @@ func (r *Repository) UpdatePassword(ctx context.Context, userID uuid.UUID, passw
 	return nil
 }
 
-func (r *Repository) CreatePasswordResetToken(ctx context.Context, token *model.PasswordResetToken) error {
+func (r *UserRepository) CreatePasswordResetToken(ctx context.Context, token *model.PasswordResetToken) error {
 	token.ID = uuid.New()
 	token.CreatedAt = time.Now()
 	token.Used = false
@@ -116,7 +116,7 @@ func (r *Repository) CreatePasswordResetToken(ctx context.Context, token *model.
 	return nil
 }
 
-func (r *Repository) GetPasswordResetToken(ctx context.Context, token string) (*model.PasswordResetToken, error) {
+func (r *UserRepository) GetPasswordResetToken(ctx context.Context, token string) (*model.PasswordResetToken, error) {
 	var resetToken model.PasswordResetToken
 	err := r.db.DB.WithContext(ctx).
 		Where("token = ? AND used = false AND expires_at > NOW()", token).
@@ -132,7 +132,7 @@ func (r *Repository) GetPasswordResetToken(ctx context.Context, token string) (*
 	return &resetToken, nil
 }
 
-func (r *Repository) MarkTokenAsUsed(ctx context.Context, tokenID uuid.UUID) error {
+func (r *UserRepository) MarkTokenAsUsed(ctx context.Context, tokenID uuid.UUID) error {
 	result := r.db.DB.WithContext(ctx).
 		Model(&model.PasswordResetToken{}).
 		Where("id = ?", tokenID).
