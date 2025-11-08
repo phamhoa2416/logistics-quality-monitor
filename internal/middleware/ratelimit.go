@@ -97,29 +97,3 @@ func RateLimitMiddleware(rps float64, burst int) gin.HandlerFunc {
 		c.Next()
 	}
 }
-
-// StrictRateLimitMiddleware creates a strict rate limiting middleware for sensitive endpoints
-func StrictRateLimitMiddleware(rps float64, burst int) gin.HandlerFunc {
-	limiter := NewRateLimiter(rps, burst)
-
-	return func(c *gin.Context) {
-		ip := c.ClientIP()
-		l := limiter.getLimiter(ip)
-
-		if !l.Allow() {
-			requestID := GetRequestID(c)
-			logger.Warn("Strict rate limit exceeded",
-				zap.String("request_id", requestID),
-				zap.String("ip", ip),
-				zap.String("path", c.Request.URL.Path),
-				zap.String("method", c.Request.Method),
-			)
-
-			utils.ErrorResponse(c, http.StatusTooManyRequests, "too many requests, please try again later")
-			c.Abort()
-			return
-		}
-
-		c.Next()
-	}
-}

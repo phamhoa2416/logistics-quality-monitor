@@ -50,8 +50,6 @@ type SMTPConfig struct {
 type RateLimitConfig struct {
 	GeneralRPS   float64 // Requests per second for general endpoints
 	GeneralBurst int     // Burst size for general endpoints
-	StrictRPS    float64 // Requests per second for strict endpoints
-	StrictBurst  int     // Burst size for strict endpoints
 }
 
 type CORSConfig struct {
@@ -108,8 +106,6 @@ func Load() (*Config, error) {
 		RateLimit: RateLimitConfig{
 			GeneralRPS:   viper.GetFloat64("RATE_LIMIT_GENERAL_RPS"),
 			GeneralBurst: viper.GetInt("RATE_LIMIT_GENERAL_BURST"),
-			StrictRPS:    viper.GetFloat64("RATE_LIMIT_STRICT_RPS"),
-			StrictBurst:  viper.GetInt("RATE_LIMIT_STRICT_BURST"),
 		},
 		CORS: CORSConfig{
 			AllowedOrigins:   viper.GetStringSlice("CORS_ALLOWED_ORIGINS"),
