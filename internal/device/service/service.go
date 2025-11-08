@@ -81,12 +81,7 @@ func (s *DeviceService) GetDeviceByHardwareUID(ctx context.Context, hardwareUID 
 		return nil, err
 	}
 
-	completeDevice, err := s.repo.GetDeviceByID(ctx, device.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	return completeDevice.ToResponse(), nil
+	return device.ToResponse(), nil
 }
 
 func (s *DeviceService) ListDevices(ctx context.Context, filter *model.DeviceFilterRequest) (*model.DeviceListResponse, error) {
@@ -318,7 +313,26 @@ func (s *DeviceService) BulkAssignOwner(ctx context.Context, req *model.BulkAssi
 	}
 
 	for _, deviceID := range req.DeviceIDs {
-		err := s.repo.AssignOwner(ctx, deviceID, req.OwnerShipperID)
+		device, err := s.repo.GetDeviceByID(ctx, deviceID)
+		if err != nil {
+			response.FailedCount++
+			response.Errors = append(response.Errors, model.BulkError{
+				DeviceID: deviceID,
+				Error:    err.Error(),
+			})
+			continue
+		}
+
+		if device.Status == model.StatusInTransit {
+			response.FailedCount++
+			response.Errors = append(response.Errors, model.BulkError{
+				DeviceID: deviceID,
+				Error:    "Cannot assign owner while device is in transit",
+			})
+			continue
+		}
+
+		err = s.repo.AssignOwner(ctx, deviceID, req.OwnerShipperID)
 		if err != nil {
 			response.FailedCount++
 			response.Errors = append(response.Errors, model.BulkError{
