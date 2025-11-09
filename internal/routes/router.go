@@ -4,17 +4,14 @@ import (
 	_ "context"
 	"github.com/gin-gonic/gin"
 	"logistics-quality-monitor/internal/config"
-	userHandler "logistics-quality-monitor/internal/delivery/http/handler"
+	"logistics-quality-monitor/internal/delivery/http/handler"
 	"logistics-quality-monitor/internal/infrastructure/database/postgres"
 	"logistics-quality-monitor/internal/logger"
 	"logistics-quality-monitor/internal/middleware"
+	"logistics-quality-monitor/internal/usecase/device"
 	"logistics-quality-monitor/internal/usecase/user"
 	"net/http"
 	_ "time"
-
-	_ "logistics-quality-monitor/internal/device/handler"
-	_ "logistics-quality-monitor/internal/device/repository"
-	_ "logistics-quality-monitor/internal/device/service"
 )
 
 func SetupRoutes(cfg *config.Config, db *postgres.DB) *gin.Engine {
@@ -48,20 +45,15 @@ func SetupRoutes(cfg *config.Config, db *postgres.DB) *gin.Engine {
 		})
 	})
 
-	// Create repository implementations (infrastructure layer)
-	userRepo := postgres.NewUserRepository(db)
+	userRepository := postgres.NewUserRepository(db)
 	refreshTokenRepo := postgres.NewRefreshTokenRepository(db)
+	userService := user.NewService(userRepository, refreshTokenRepo, cfg)
+	userHandler := handler.NewUserHandler(userService)
 
-	// Create use case (depends on domain interfaces)
-	userService := user.NewService(userRepo, refreshTokenRepo, cfg)
+	deviceRepository := postgres.NewDeviceRepository(db)
+	deviceService := device.NewService(deviceRepository, userRepository)
+	deviceHandler := handler.NewDeviceHandler(deviceService)
 
-	// Create handler (depends on use case)
-	userHdl := userHandler.NewUserHandler(userService)
-
-	//deviceRepo := deviceRepository.NewRepository(db)
-	//deviceSvc := deviceService.NewService(deviceRepo, *userRepo, cfg)
-	//deviceHdl := deviceHandler.NewHandler(deviceSvc)
-	//
 	//// Start token cleanup job
 	//cleanupCtx, cleanupCancel := context.WithCancel(context.Background())
 	//defer cleanupCancel()
@@ -69,21 +61,21 @@ func SetupRoutes(cfg *config.Config, db *postgres.DB) *gin.Engine {
 
 	v1 := router.Group("/api/v1")
 	{
-		userHdl.RegisterRoutes(v1)
-		//deviceHdl.RegisterRoutes(v1)
+		userHandler.RegisterRoutes(v1)
+		deviceHandler.RegisterRoutes(v1)
 		//deviceHdl.RegisterAdminRoutes(v1)
 
 		protected := v1.Group("")
 		protected.Use(middleware.AuthMiddleware(cfg))
 		{
-			userHdl.RegisterProfileRoutes(protected)
-			protected.POST("/revoke", userHdl.RevokeToken)
+			userHandler.RegisterProfileRoutes(protected)
+			protected.POST("/revoke", userHandler.RevokeToken)
 
 			admin := protected.Group("/admin")
 			admin.Use(middleware.AdminOnly())
 			{
-				userHdl.RegisterAdminRoutes(admin)
-				//deviceHdl.RegisterAdminRoutes(admin)
+				userHandler.RegisterAdminRoutes(admin)
+				deviceHandler.RegisterAdminRoutes(admin)
 			}
 		}
 	}
