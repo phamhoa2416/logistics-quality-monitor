@@ -1,24 +1,23 @@
 package routes
 
 import (
-	"context"
+	_ "context"
 	"github.com/gin-gonic/gin"
 	"logistics-quality-monitor/internal/config"
-	"logistics-quality-monitor/internal/database"
+	userHandler "logistics-quality-monitor/internal/delivery/http/handler"
+	"logistics-quality-monitor/internal/infrastructure/database/postgres"
 	"logistics-quality-monitor/internal/logger"
 	"logistics-quality-monitor/internal/middleware"
-	userHandler "logistics-quality-monitor/internal/user/handler"
-	userRepository "logistics-quality-monitor/internal/user/repository"
-	userService "logistics-quality-monitor/internal/user/service"
+	"logistics-quality-monitor/internal/usecase/user"
 	"net/http"
-	"time"
+	_ "time"
 
-	deviceHandler "logistics-quality-monitor/internal/device/handler"
-	deviceRepository "logistics-quality-monitor/internal/device/repository"
-	deviceService "logistics-quality-monitor/internal/device/service"
+	_ "logistics-quality-monitor/internal/device/handler"
+	_ "logistics-quality-monitor/internal/device/repository"
+	_ "logistics-quality-monitor/internal/device/service"
 )
 
-func SetupRoutes(cfg *config.Config, db *database.Database) *gin.Engine {
+func SetupRoutes(cfg *config.Config, db *postgres.DB) *gin.Engine {
 	if cfg.Server.Environment == "production" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -49,24 +48,29 @@ func SetupRoutes(cfg *config.Config, db *database.Database) *gin.Engine {
 		})
 	})
 
-	userRepo := userRepository.NewRepository(db)
-	refreshRepo := userRepository.NewRefreshTokenRepository(db)
-	userSvc := userService.NewService(userRepo, refreshRepo, cfg)
-	userHdl := userHandler.NewHandler(userSvc)
+	// Create repository implementations (infrastructure layer)
+	userRepo := postgres.NewUserRepository(db)
+	refreshTokenRepo := postgres.NewRefreshTokenRepository(db)
 
-	deviceRepo := deviceRepository.NewRepository(db)
-	deviceSvc := deviceService.NewService(deviceRepo, *userRepo, cfg)
-	deviceHdl := deviceHandler.NewHandler(deviceSvc)
+	// Create use case (depends on domain interfaces)
+	userService := user.NewService(userRepo, refreshTokenRepo, cfg)
 
-	// Start token cleanup job
-	cleanupCtx, cleanupCancel := context.WithCancel(context.Background())
-	defer cleanupCancel()
-	go userSvc.StartTokenCleanupJob(cleanupCtx, 1*time.Hour)
+	// Create handler (depends on use case)
+	userHdl := userHandler.NewUserHandler(userService)
+
+	//deviceRepo := deviceRepository.NewRepository(db)
+	//deviceSvc := deviceService.NewService(deviceRepo, *userRepo, cfg)
+	//deviceHdl := deviceHandler.NewHandler(deviceSvc)
+	//
+	//// Start token cleanup job
+	//cleanupCtx, cleanupCancel := context.WithCancel(context.Background())
+	//defer cleanupCancel()
+	//go userSvc.StartTokenCleanupJob(cleanupCtx, 1*time.Hour)
 
 	v1 := router.Group("/api/v1")
 	{
 		userHdl.RegisterRoutes(v1)
-		deviceHdl.RegisterRoutes(v1)
+		//deviceHdl.RegisterRoutes(v1)
 		//deviceHdl.RegisterAdminRoutes(v1)
 
 		protected := v1.Group("")
@@ -79,7 +83,7 @@ func SetupRoutes(cfg *config.Config, db *database.Database) *gin.Engine {
 			admin.Use(middleware.AdminOnly())
 			{
 				userHdl.RegisterAdminRoutes(admin)
-				deviceHdl.RegisterAdminRoutes(admin)
+				//deviceHdl.RegisterAdminRoutes(admin)
 			}
 		}
 	}
