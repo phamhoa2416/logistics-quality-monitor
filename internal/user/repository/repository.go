@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"logistics-quality-monitor/internal/database"
 	"logistics-quality-monitor/internal/user/model"
 	appErrors "logistics-quality-monitor/pkg/errors"
@@ -63,6 +64,30 @@ func (r *UserRepository) GetUserByID(ctx context.Context, userID uuid.UUID) (*mo
 		return nil, fmt.Errorf("failed to get user: %w", err)
 	}
 	return &user, nil
+}
+
+func (r *UserRepository) GetAllUsers(ctx context.Context) ([]*model.User, error) {
+	var users []*model.User
+	err := r.db.DB.WithContext(ctx).Find(&users).Error
+	if err != nil {
+		log.Printf("Error retrieving users: %v", err)
+		return nil, fmt.Errorf("failed to get users: %w", err)
+	}
+
+	return users, nil
+}
+
+func (r *UserRepository) DeleteUser(ctx context.Context, userID uuid.UUID) error {
+	result := r.db.DB.WithContext(ctx).Delete(&model.User{}, "id = ?", userID)
+	if result.Error != nil {
+		return fmt.Errorf("failed to delete user: %w", result.Error)
+	}
+
+	if result.RowsAffected == 0 {
+		return appErrors.ErrUserNotFound
+	}
+
+	return nil
 }
 
 func (r *UserRepository) UpdateUser(ctx context.Context, user *model.User) error {
