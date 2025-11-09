@@ -7,7 +7,6 @@ import (
 )
 
 // UserModel represents the database model for User
-// This contains GORM tags for database mapping
 type UserModel struct {
 	ID             uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
 	Username       string    `gorm:"type:varchar(100);not null;uniqueIndex"`

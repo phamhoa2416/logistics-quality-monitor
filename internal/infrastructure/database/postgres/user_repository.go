@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"logistics-quality-monitor/server/domain/user"
-	"logistics-quality-monitor/server/infrastructure/database/postgres/models"
+	"logistics-quality-monitor/internal/domain/user"
+	"logistics-quality-monitor/internal/infrastructure/database/postgres/models"
 	"strings"
 	"time"
 
