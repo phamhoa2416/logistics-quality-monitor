@@ -26,9 +26,14 @@ func (h *DeviceHandler) RegisterRoutes(router *gin.RouterGroup) {
 		devices.GET("/:id", h.GetDevice)
 		devices.GET("/hardware/:uid", h.GetDeviceByHardwareUID)
 		devices.GET("/available", h.GetAvailableDevices)
+	}
+}
 
+func (h *DeviceHandler) RegisterAdminRoutes(router *gin.RouterGroup) {
+	devices := router.Group("/devices")
+	{
 		// Admin-only routes
-		devices.POST("", h.CreateDevice)
+		devices.POST("/create", h.CreateDevice)
 		devices.PUT("/:id", h.UpdateDevice)
 		devices.DELETE("/:id", h.DeleteDevice)
 		devices.POST("/:id/assign-owner", h.AssignOwner)

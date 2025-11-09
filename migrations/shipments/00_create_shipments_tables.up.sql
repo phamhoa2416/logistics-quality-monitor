@@ -54,3 +54,9 @@ CREATE TRIGGER update_shipments_updated_at
     ON shipments
     FOR EACH ROW
 EXECUTE FUNCTION update_updated_at_column();
+
+ALTER TABLE devices
+    ADD CONSTRAINT fk_devices_current_shipment
+        FOREIGN KEY (current_shipment_id)
+            REFERENCES shipments (id)
+            ON DELETE SET NULL;

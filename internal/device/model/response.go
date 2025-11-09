@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	user "logistics-quality-monitor/internal/user/model"
 )
 
 type DeviceResponse struct {
@@ -21,7 +22,7 @@ type DeviceResponse struct {
 	IsOnline          bool         `json:"is_online"`
 	CreatedAt         time.Time    `json:"created_at"`
 	UpdatedAt         time.Time    `json:"updated_at"`
-	OwnerShipper      *OwnerInfo   `json:"owner_shipper,omitempty"`
+	OwnerShipper      *user.User   `json:"owner_shipper,omitempty"`
 }
 
 type DeviceListResponse struct {

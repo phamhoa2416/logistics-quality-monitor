@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	user "logistics-quality-monitor/internal/user/model"
 )
 
 type Device struct {
@@ -21,12 +22,5 @@ type Device struct {
 	CreatedAt         time.Time    `json:"created_at"`
 	UpdatedAt         time.Time    `json:"updated_at"`
 
-	OwnerShipper *OwnerInfo `json:"owner_shipper,omitempty"`
-}
-
-type OwnerInfo struct {
-	ID          uuid.UUID `json:"id"`
-	FullName    string    `json:"full_name"`
-	Email       string    `json:"email"`
-	PhoneNumber *string   `json:"phone_number"`
+	OwnerShipper *user.User `json:"owner_shipper,omitempty" gorm:"foreignKey:OwnerShipperID;references:ID"`
 }

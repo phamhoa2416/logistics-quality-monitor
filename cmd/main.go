@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"logistics-quality-monitor/internal/logger"
+	"logistics-quality-monitor/internal/routes"
 	"net"
 	"net/http"
 	"os"
@@ -12,15 +13,9 @@ import (
 	"syscall"
 	"time"
 
+	"go.uber.org/zap"
 	"logistics-quality-monitor/internal/config"
 	"logistics-quality-monitor/internal/database"
-	"logistics-quality-monitor/internal/middleware"
-	"logistics-quality-monitor/internal/user/handler"
-	"logistics-quality-monitor/internal/user/repository"
-	"logistics-quality-monitor/internal/user/service"
-
-	"github.com/gin-gonic/gin"
-	"go.uber.org/zap"
 )
 
 func main() {
@@ -61,68 +56,7 @@ func main() {
 		}
 	}()
 
-	userRepository := repository.NewRepository(db)
-	refreshTokenRepository := repository.NewRefreshTokenRepository(db)
-	userService := service.NewService(userRepository, refreshTokenRepository, cfg)
-	userHandler := handler.NewHandler(userService)
-
-	// Start token cleanup job
-	cleanupCtx, cleanupCancel := context.WithCancel(context.Background())
-	defer cleanupCancel()
-	go userService.StartTokenCleanupJob(cleanupCtx, 1*time.Hour)
-
-	// Set Gin mode based on environment
-	if cfg.Server.Environment == "production" {
-		gin.SetMode(gin.ReleaseMode)
-	}
-
-	router := gin.Default()
-
-	// Add middleware in order: request ID, logging, security headers, CORS, request size limit, general rate limit
-	router.Use(gin.Recovery())
-	router.Use(middleware.RequestIDMiddleware())
-	router.Use(middleware.LoggingMiddleware())
-	router.Use(middleware.SecurityHeadersMiddleware())
-	router.Use(middleware.CORSMiddleware(&cfg.CORS))
-	router.Use(middleware.RequestSizeLimitMiddleware(10 << 20))
-	router.Use(middleware.RateLimitMiddleware(cfg.RateLimit.GeneralRPS, cfg.RateLimit.GeneralBurst))
-
-	router.GET("/health", func(c *gin.Context) {
-		if err := db.Health(); err != nil {
-			c.JSON(http.StatusServiceUnavailable, gin.H{
-				"status":  "unhealthy",
-				"message": "Database connection failed",
-			})
-			return
-		}
-
-		c.JSON(http.StatusOK, gin.H{
-			"status":  "healthy",
-			"message": "Service is running",
-		})
-	})
-
-	v1 := router.Group("/api/v1")
-	{
-		userHandler.RegisterRoutes(v1)
-
-		protected := v1.Group("")
-		protected.Use(middleware.AuthMiddleware(cfg))
-		{
-			userHandler.RegisterProfileRoutes(protected)
-			protected.POST("/revoke", userHandler.RevokeToken)
-
-			admin := protected.Group("/admin")
-			admin.Use(middleware.AdminOnly())
-			{
-				admin.GET("/users", func(c *gin.Context) {
-					c.JSON(http.StatusOK, gin.H{
-						"message": "Admin users list",
-					})
-				})
-			}
-		}
-	}
+	router := routes.SetupRoutes(cfg, db)
 
 	host := cfg.Server.Host
 	if host == "" {

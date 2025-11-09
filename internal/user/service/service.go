@@ -352,6 +352,33 @@ func (s *UserService) UpdateProfile(ctx context.Context, userID uuid.UUID, reque
 	return user.ToResponse(), nil
 }
 
+func (s *UserService) GetAllUsers(ctx context.Context) ([]*model.UserResponse, error) {
+	users, err := s.repo.GetAllUsers(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var userResponses []*model.UserResponse
+	for _, user := range users {
+		userResponses = append(userResponses, user.ToResponse())
+	}
+
+	return userResponses, nil
+}
+
+func (s *UserService) DeleteUser(ctx context.Context, userID uuid.UUID) error {
+	if err := s.repo.DeleteUser(ctx, userID); err != nil {
+		return err
+	}
+
+	logger.Info("User deleted successfully",
+		zap.String("user_id", userID.String()),
+		zap.String("event", "user_deleted"),
+	)
+
+	return nil
+}
+
 func (s *UserService) RefreshToken(ctx context.Context, refreshToken string) (*utils.TokenPair, error) {
 	// Validate JWT token
 	claims, err := utils.ValidateToken(refreshToken, s.config.JWT.Secret)

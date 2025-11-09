@@ -36,6 +36,14 @@ func (h *UserHandler) RegisterRoutes(router *gin.RouterGroup) {
 	}
 }
 
+func (h *UserHandler) RegisterAdminRoutes(router *gin.RouterGroup) {
+	admin := router.Group("")
+	{
+		admin.GET("/users", h.GetAllUsers)
+		admin.DELETE("/users/:user_id", h.DeleteUser)
+	}
+}
+
 func (h *UserHandler) Register(c *gin.Context) {
 	var request model.RegisterRequest
 
@@ -116,6 +124,33 @@ func (h *UserHandler) ResetPassword(c *gin.Context) {
 	}
 
 	utils.SuccessResponse(c, http.StatusOK, "Password reset successfully", nil)
+}
+
+func (h *UserHandler) GetAllUsers(c *gin.Context) {
+	users, err := h.service.GetAllUsers(c.Request.Context())
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to get users")
+		return
+	}
+
+	utils.SuccessResponse(c, http.StatusOK, "Users retrieved successfully", users)
+}
+
+func (h *UserHandler) DeleteUser(c *gin.Context) {
+	userIDParam := c.Param("user_id")
+	userID, err := uuid.Parse(userIDParam)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Invalid user ID")
+		return
+	}
+
+	err = h.service.DeleteUser(c.Request.Context(), userID)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Failed to delete user")
+		return
+	}
+
+	utils.SuccessResponse(c, http.StatusOK, "User deleted successfully", nil)
 }
 
 func (h *UserHandler) RefreshToken(c *gin.Context) {
