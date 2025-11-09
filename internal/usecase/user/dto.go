@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	domainUser "logistics-quality-monitor/server/domain/user"
+	domainUser "logistics-quality-monitor/internal/domain/user"
 )
 
 type RegisterRequest struct {

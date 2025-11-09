@@ -5,10 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"logistics-quality-monitor/internal/config"
+	domainUser "logistics-quality-monitor/internal/domain/user"
 	"logistics-quality-monitor/internal/logger"
 	appErrors "logistics-quality-monitor/pkg/errors"
 	"logistics-quality-monitor/pkg/utils"
-	domainUser "logistics-quality-monitor/server/domain/user"
 	"time"
 
 	"github.com/google/uuid"

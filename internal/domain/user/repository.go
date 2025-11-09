@@ -9,7 +9,6 @@ import (
 
 // Repository defines the interface for user repository operations
 type Repository interface {
-	// User operations
 	Create(ctx context.Context, user *User) error
 	GetByEmail(ctx context.Context, email string) (*User, error)
 	GetByID(ctx context.Context, userID uuid.UUID) (*User, error)
@@ -18,7 +17,6 @@ type Repository interface {
 	UpdatePassword(ctx context.Context, userID uuid.UUID, passwordHash string) error
 	Delete(ctx context.Context, userID uuid.UUID) error
 
-	// Password reset token operations
 	CreatePasswordResetToken(ctx context.Context, token *PasswordResetToken) error
 	GetPasswordResetToken(ctx context.Context, token string) (*PasswordResetToken, error)
 	MarkTokenAsUsed(ctx context.Context, tokenID uuid.UUID) error
