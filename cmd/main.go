@@ -3,7 +3,10 @@ package main
 import (
 	"context"
 	"errors"
+	"go.uber.org/zap"
 	"log"
+	"logistics-quality-monitor/internal/config"
+	"logistics-quality-monitor/internal/infrastructure/database/postgres"
 	"logistics-quality-monitor/internal/logger"
 	"logistics-quality-monitor/internal/routes"
 	"net"
@@ -12,10 +15,6 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
-
-	"go.uber.org/zap"
-	"logistics-quality-monitor/internal/config"
-	"logistics-quality-monitor/internal/database"
 )
 
 func main() {
@@ -46,18 +45,24 @@ func main() {
 		logger.Fatal("JWT secret is missing. Please set JWT_SECRET environment variable.")
 	}
 
-	db, err := database.NewDatabase(cfg)
-	if err != nil {
-		logger.Fatal("Failed to connect to database: %v", zap.Error(err))
-	}
-	defer func() {
-		if err := db.Close(); err != nil {
-			logger.Error("Failed to close database connection: %v", zap.Error(err))
+	// Initialize infrastructure
+	db, _ := postgres.NewDB(cfg)
+	defer func(db *postgres.DB) {
+		err := db.Close()
+		if err != nil {
+			logger.Fatal("Failed to close DB", zap.Error(err))
 		}
-	}()
+	}(db)
 
+	// Start token cleanup job
+	//cleanupCtx, cleanupCancel := context.WithCancel(context.Background())
+	//defer cleanupCancel()
+	//go userService.StartTokenCleanupJob(cleanupCtx, 1*time.Hour)
+
+	// Setup routes
 	router := routes.SetupRoutes(cfg, db)
 
+	// Start server...
 	host := cfg.Server.Host
 	if host == "" {
 		host = "0.0.0.0"
