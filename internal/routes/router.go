@@ -2,16 +2,18 @@ package routes
 
 import (
 	_ "context"
-	"github.com/gin-gonic/gin"
 	"logistics-quality-monitor/internal/config"
 	"logistics-quality-monitor/internal/delivery/http/handler"
 	"logistics-quality-monitor/internal/infrastructure/database/postgres"
 	"logistics-quality-monitor/internal/logger"
 	"logistics-quality-monitor/internal/middleware"
 	"logistics-quality-monitor/internal/usecase/device"
+	"logistics-quality-monitor/internal/usecase/shipment"
 	"logistics-quality-monitor/internal/usecase/user"
 	"net/http"
 	_ "time"
+
+	"github.com/gin-gonic/gin"
 )
 
 func SetupRoutes(cfg *config.Config, db *postgres.DB) *gin.Engine {
@@ -54,6 +56,10 @@ func SetupRoutes(cfg *config.Config, db *postgres.DB) *gin.Engine {
 	deviceService := device.NewService(deviceRepository, userRepository)
 	deviceHandler := handler.NewDeviceHandler(deviceService)
 
+	shipmentRepository := postgres.NewShipmentRepository(db)
+	shipmentService := shipment.NewService(shipmentRepository, userRepository, deviceRepository)
+	shipmentHandler := handler.NewShipmentHandler(shipmentService)
+
 	//// Start token cleanup job
 	//cleanupCtx, cleanupCancel := context.WithCancel(context.Background())
 	//defer cleanupCancel()
@@ -63,13 +69,34 @@ func SetupRoutes(cfg *config.Config, db *postgres.DB) *gin.Engine {
 	{
 		userHandler.RegisterRoutes(v1)
 		deviceHandler.RegisterRoutes(v1)
-		//deviceHdl.RegisterAdminRoutes(v1)
+		shipmentHandler.RegisterRoutes(v1)
 
 		protected := v1.Group("")
 		protected.Use(middleware.AuthMiddleware(cfg))
 		{
 			userHandler.RegisterProfileRoutes(protected)
 			protected.POST("/revoke", userHandler.RevokeToken)
+
+			// Customer routes
+			customer := protected.Group("")
+			customer.Use(middleware.RoleMiddleware("customer"))
+			{
+				shipmentHandler.RegisterCustomerRoutes(customer)
+			}
+
+			// Provider routes
+			provider := protected.Group("")
+			provider.Use(middleware.RoleMiddleware("provider"))
+			{
+				shipmentHandler.RegisterProviderRoutes(provider)
+			}
+
+			// Shipper routes
+			shipper := protected.Group("")
+			shipper.Use(middleware.RoleMiddleware("shipper"))
+			{
+				shipmentHandler.RegisterShipperRoutes(shipper)
+			}
 
 			admin := protected.Group("/admin")
 			admin.Use(middleware.AdminOnly())
