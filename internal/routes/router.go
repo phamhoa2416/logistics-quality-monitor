@@ -2,7 +2,6 @@ package routes
 
 import (
 	_ "context"
-	"github.com/gin-gonic/gin"
 	"logistics-quality-monitor/internal/config"
 	"logistics-quality-monitor/internal/delivery/http/handler"
 	"logistics-quality-monitor/internal/infrastructure/database/postgres"
@@ -13,6 +12,8 @@ import (
 	"logistics-quality-monitor/internal/usecase/user"
 	"net/http"
 	_ "time"
+
+	"github.com/gin-gonic/gin"
 )
 
 func SetupRoutes(cfg *config.Config, db *postgres.DB) *gin.Engine {
