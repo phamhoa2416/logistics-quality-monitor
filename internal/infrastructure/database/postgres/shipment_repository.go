@@ -284,14 +284,47 @@ func (r *ShipmentRepository) GetStatistics(ctx context.Context) (*shipment.Stati
 		return nil, fmt.Errorf("failed to get completed today: %w", err)
 	}
 
-	// Get average delivery time
+	// Get revenue today
 	err = r.db.DB.WithContext(ctx).Raw(`
+		SELECT COALESCE(SUM(goods_value), 0) as total
+		FROM shipments
+		WHERE status = 'completed' AND DATE(actual_delivery_at) = DATE(?)
+	`, today).Scan(&stats.RevenueToday).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to get revenue today: %w", err)
+	}
+
+	// Calculate metrics
+	if stats.TotalShipments > 0 {
+		completedCount := stats.ByStatus["completed"]
+		issueCount := stats.ByStatus["issue_reported"]
+
+		// On-time delivery rate
+		var onTimeCount int
+		err = r.db.DB.WithContext(ctx).Raw(`
+			SELECT COUNT(*) as count
+			FROM shipments
+			WHERE status = 'completed' AND actual_delivery_at <= estimated_delivery_at
+		`).Scan(&onTimeCount).Error
+		if err != nil {
+			return nil, fmt.Errorf("failed to get on-time delivery count: %w", err)
+		}
+
+		if completedCount > 0 {
+			stats.OnTimeDeliveryRate = float64(onTimeCount) / float64(completedCount) * 100
+		}
+
+		stats.IssueRate = float64(issueCount) / float64(stats.TotalShipments) * 100
+
+		// Get average delivery time
+		err = r.db.DB.WithContext(ctx).Raw(`
 		SELECT AVG(EXTRACT(EPOCH FROM (actual_delivery_at - actual_pickup_at)) / 3600.0) as avg_hours
 		FROM shipments
 		WHERE status = 'completed' AND actual_pickup_at IS NOT NULL AND actual_delivery_at IS NOT NULL
-	`).Scan(&stats.AverageDeliveryTime).Error
-	if err != nil {
-		return nil, fmt.Errorf("failed to get average delivery time: %w", err)
+		`).Scan(&stats.AverageDeliveryTime).Error
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return stats, nil
