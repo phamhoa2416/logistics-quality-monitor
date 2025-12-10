@@ -2,14 +2,14 @@ package shipment
 
 //
 import (
+	domainDevice "cargo-tracker/internal/domain/device"
+	domainShipment "cargo-tracker/internal/domain/shipment"
+	domainUser "cargo-tracker/internal/domain/user"
+	"cargo-tracker/internal/logger"
+	appErrors "cargo-tracker/pkg/errors"
+	"cargo-tracker/pkg/utils"
 	"context"
 	"fmt"
-	domainDevice "logistics-quality-monitor/internal/domain/device"
-	domainShipment "logistics-quality-monitor/internal/domain/shipment"
-	domainUser "logistics-quality-monitor/internal/domain/user"
-	"logistics-quality-monitor/internal/logger"
-	appErrors "logistics-quality-monitor/pkg/errors"
-	"logistics-quality-monitor/pkg/utils"
 	"time"
 
 	"github.com/google/uuid"

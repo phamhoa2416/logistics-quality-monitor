@@ -1,7 +1,7 @@
 package middleware
 
 import (
-	"logistics-quality-monitor/internal/logger"
+	"cargo-tracker/internal/logger"
 	"time"
 
 	"github.com/gin-gonic/gin"

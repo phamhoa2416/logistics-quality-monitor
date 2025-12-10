@@ -1,7 +1,7 @@
 package middleware
 
 import (
-	"logistics-quality-monitor/internal/config"
+	"cargo-tracker/internal/config"
 	"time"
 
 	"github.com/gin-contrib/cors"

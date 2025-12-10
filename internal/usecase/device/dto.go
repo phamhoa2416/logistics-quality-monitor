@@ -3,8 +3,8 @@ package device
 import (
 	"time"
 
+	domainDevice "cargo-tracker/internal/domain/device"
 	"github.com/google/uuid"
-	domainDevice "logistics-quality-monitor/internal/domain/device"
 )
 
 type CreateDeviceRequest struct {

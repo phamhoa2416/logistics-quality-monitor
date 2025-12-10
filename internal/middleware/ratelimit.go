@@ -1,8 +1,8 @@
 package middleware
 
 import (
-	"logistics-quality-monitor/internal/logger"
-	"logistics-quality-monitor/pkg/utils"
+	"cargo-tracker/internal/logger"
+	"cargo-tracker/pkg/utils"
 	"net/http"
 	"sync"
 	"time"

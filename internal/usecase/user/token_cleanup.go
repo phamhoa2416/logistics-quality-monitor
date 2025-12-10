@@ -1,8 +1,8 @@
 package user
 
 import (
+	"cargo-tracker/internal/logger"
 	"context"
-	"logistics-quality-monitor/internal/logger"
 	"time"
 
 	"go.uber.org/zap"

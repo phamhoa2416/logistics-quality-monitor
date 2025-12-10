@@ -1,12 +1,12 @@
 package postgres
 
 import (
+	"cargo-tracker/internal/domain/shipment"
+	"cargo-tracker/internal/infrastructure/database/postgres/models"
+	appErrors "cargo-tracker/pkg/errors"
 	"context"
 	"errors"
 	"fmt"
-	"logistics-quality-monitor/internal/domain/shipment"
-	"logistics-quality-monitor/internal/infrastructure/database/postgres/models"
-	appErrors "logistics-quality-monitor/pkg/errors"
 	"strings"
 	"time"
 

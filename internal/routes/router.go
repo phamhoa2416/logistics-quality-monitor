@@ -1,15 +1,15 @@
 package routes
 
 import (
+	"cargo-tracker/internal/config"
+	"cargo-tracker/internal/delivery/http/handler"
+	"cargo-tracker/internal/infrastructure/database/postgres"
+	"cargo-tracker/internal/logger"
+	"cargo-tracker/internal/middleware"
+	"cargo-tracker/internal/usecase/device"
+	"cargo-tracker/internal/usecase/shipment"
+	"cargo-tracker/internal/usecase/user"
 	_ "context"
-	"logistics-quality-monitor/internal/config"
-	"logistics-quality-monitor/internal/delivery/http/handler"
-	"logistics-quality-monitor/internal/infrastructure/database/postgres"
-	"logistics-quality-monitor/internal/logger"
-	"logistics-quality-monitor/internal/middleware"
-	"logistics-quality-monitor/internal/usecase/device"
-	"logistics-quality-monitor/internal/usecase/shipment"
-	"logistics-quality-monitor/internal/usecase/user"
 	"net/http"
 	_ "time"
 

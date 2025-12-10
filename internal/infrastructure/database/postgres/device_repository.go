@@ -1,11 +1,11 @@
 package postgres
 
 import (
+	domainDevice "cargo-tracker/internal/domain/device"
+	"cargo-tracker/internal/infrastructure/database/postgres/models"
 	"context"
 	"errors"
 	"fmt"
-	domainDevice "logistics-quality-monitor/internal/domain/device"
-	"logistics-quality-monitor/internal/infrastructure/database/postgres/models"
 	"strings"
 	"time"
 

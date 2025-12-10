@@ -1,8 +1,8 @@
 package middleware
 
 import (
-	"logistics-quality-monitor/internal/config"
-	"logistics-quality-monitor/pkg/utils"
+	"cargo-tracker/internal/config"
+	"cargo-tracker/pkg/utils"
 	"net/http"
 	"strings"
 

@@ -1,14 +1,14 @@
 package user
 
 import (
+	"cargo-tracker/internal/config"
+	domainUser "cargo-tracker/internal/domain/user"
+	"cargo-tracker/internal/logger"
+	appErrors "cargo-tracker/pkg/errors"
+	"cargo-tracker/pkg/utils"
 	"context"
 	"errors"
 	"fmt"
-	"logistics-quality-monitor/internal/config"
-	domainUser "logistics-quality-monitor/internal/domain/user"
-	"logistics-quality-monitor/internal/logger"
-	appErrors "logistics-quality-monitor/pkg/errors"
-	"logistics-quality-monitor/pkg/utils"
 	"time"
 
 	"github.com/google/uuid"

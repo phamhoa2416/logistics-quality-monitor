@@ -1,8 +1,8 @@
 package handler
 
 import (
-	"logistics-quality-monitor/internal/usecase/device"
-	"logistics-quality-monitor/pkg/utils"
+	"cargo-tracker/internal/usecase/device"
+	"cargo-tracker/pkg/utils"
 	"net/http"
 
 	"github.com/gin-gonic/gin"

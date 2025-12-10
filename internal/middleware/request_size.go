@@ -1,7 +1,7 @@
 package middleware
 
 import (
-	"logistics-quality-monitor/pkg/utils"
+	"cargo-tracker/pkg/utils"
 	"net/http"
 
 	"github.com/gin-gonic/gin"

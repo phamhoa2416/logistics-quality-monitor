@@ -1,9 +1,9 @@
 package postgres
 
 import (
+	"cargo-tracker/internal/config"
+	"cargo-tracker/internal/logger"
 	"fmt"
-	"logistics-quality-monitor/internal/config"
-	"logistics-quality-monitor/internal/logger"
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"

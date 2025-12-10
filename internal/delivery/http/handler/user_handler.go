@@ -1,14 +1,14 @@
 package handler
 
 import (
+	"cargo-tracker/internal/usecase/user"
 	"errors"
-	"logistics-quality-monitor/internal/usecase/user"
 	"net/http"
 
-	"logistics-quality-monitor/internal/logger"
-	"logistics-quality-monitor/internal/middleware"
-	appErrors "logistics-quality-monitor/pkg/errors"
-	"logistics-quality-monitor/pkg/utils"
+	"cargo-tracker/internal/logger"
+	"cargo-tracker/internal/middleware"
+	appErrors "cargo-tracker/pkg/errors"
+	"cargo-tracker/pkg/utils"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"

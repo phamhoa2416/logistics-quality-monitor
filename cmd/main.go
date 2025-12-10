@@ -1,14 +1,14 @@
 package main
 
 import (
+	"cargo-tracker/internal/config"
+	"cargo-tracker/internal/infrastructure/database/postgres"
+	"cargo-tracker/internal/logger"
+	"cargo-tracker/internal/routes"
 	"context"
 	"errors"
 	"go.uber.org/zap"
 	"log"
-	"logistics-quality-monitor/internal/config"
-	"logistics-quality-monitor/internal/infrastructure/database/postgres"
-	"logistics-quality-monitor/internal/logger"
-	"logistics-quality-monitor/internal/routes"
 	"net"
 	"net/http"
 	"os"

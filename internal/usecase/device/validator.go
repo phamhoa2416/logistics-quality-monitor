@@ -1,11 +1,11 @@
 package device
 
 import (
+	domainDevice "cargo-tracker/internal/domain/device"
+	domainUser "cargo-tracker/internal/domain/user"
+	appErrors "cargo-tracker/pkg/errors"
 	"context"
 	"fmt"
-	domainDevice "logistics-quality-monitor/internal/domain/device"
-	domainUser "logistics-quality-monitor/internal/domain/user"
-	appErrors "logistics-quality-monitor/pkg/errors"
 
 	"github.com/google/uuid"
 )

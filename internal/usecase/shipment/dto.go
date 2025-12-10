@@ -3,7 +3,7 @@ package shipment
 import (
 	"time"
 
-	domainShipment "logistics-quality-monitor/internal/domain/shipment"
+	domainShipment "cargo-tracker/internal/domain/shipment"
 
 	"github.com/google/uuid"
 )

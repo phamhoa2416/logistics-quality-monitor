@@ -3,8 +3,8 @@ package user
 import (
 	"time"
 
+	domainUser "cargo-tracker/internal/domain/user"
 	"github.com/google/uuid"
-	domainUser "logistics-quality-monitor/internal/domain/user"
 )
 
 type RegisterRequest struct {
